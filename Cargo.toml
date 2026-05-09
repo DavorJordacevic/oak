@@ -1,0 +1,23 @@
+[package]
+name = "oak"
+version = "0.1.0"
+edition = "2024"
+description = "A modern, fast, gitignore-aware directory listing"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "oak"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+ignore = "0.4"
+owo-colors = { version = "4", features = ["supports-colors"] }
+anyhow = "1"
+regex = "1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
