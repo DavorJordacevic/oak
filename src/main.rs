@@ -30,14 +30,38 @@ struct Cli {
     #[arg(short = 'L', long, help = "Maximum display depth")]
     level: Option<usize>,
 
-    #[arg(short = 'a', long, help = "Show hidden files")]
+    #[arg(
+        short = 'a',
+        long,
+        conflicts_with = "hide_hidden",
+        help = "Show hidden files"
+    )]
     all: bool,
 
-    #[arg(short = 's', long, help = "Show file sizes")]
+    #[arg(long, conflicts_with = "all", help = "Hide hidden files")]
+    hide_hidden: bool,
+
+    #[arg(
+        short = 's',
+        long,
+        conflicts_with = "no_sizes",
+        help = "Show file sizes"
+    )]
     sizes: bool,
 
-    #[arg(short = 't', long, help = "Show modification times")]
+    #[arg(long, conflicts_with = "sizes", help = "Hide file sizes")]
+    no_sizes: bool,
+
+    #[arg(
+        short = 't',
+        long,
+        conflicts_with = "no_times",
+        help = "Show modification times"
+    )]
     times: bool,
+
+    #[arg(long, conflicts_with = "times", help = "Hide modification times")]
+    no_times: bool,
 
     #[arg(short = 'P', long, help = "Only show files matching pattern (regex)")]
     pattern: Option<String>,
@@ -51,19 +75,36 @@ struct Cli {
     #[arg(long, help = "Do not read saved config")]
     no_config: bool,
 
-    #[arg(long, help = "Do not respect .gitignore / .ignore files")]
+    #[arg(
+        long,
+        conflicts_with = "ignore",
+        help = "Do not respect .gitignore / .ignore files"
+    )]
     no_ignore: bool,
 
-    #[arg(long, help = "Disable icons")]
+    #[arg(
+        long,
+        conflicts_with = "no_ignore",
+        help = "Respect .gitignore / .ignore files"
+    )]
+    ignore: bool,
+
+    #[arg(long, conflicts_with = "icons", help = "Disable icons")]
     no_icons: bool,
 
-    #[arg(long, help = "Output without color")]
+    #[arg(long, conflicts_with = "no_icons", help = "Enable icons")]
+    icons: bool,
+
+    #[arg(long, conflicts_with = "color", help = "Output without color")]
     no_color: bool,
 
-    #[arg(long, help = "Show directories only")]
+    #[arg(long, conflicts_with = "no_color", help = "Enable color output")]
+    color: bool,
+
+    #[arg(long, conflicts_with = "files_only", help = "Show directories only")]
     dirs_only: bool,
 
-    #[arg(long, help = "Show files only")]
+    #[arg(long, conflicts_with = "dirs_only", help = "Show files only")]
     files_only: bool,
 
     #[arg(short = 'S', long, value_enum, help = "Sort order")]
@@ -79,16 +120,24 @@ fn main() -> Result<()> {
     };
     let cli_config = Config {
         level: cli.level,
-        all: cli.all.then_some(true),
-        sizes: cli.sizes.then_some(true),
-        times: cli.times.then_some(true),
+        all: bool_override(cli.all, cli.hide_hidden),
+        sizes: bool_override(cli.sizes, cli.no_sizes),
+        times: bool_override(cli.times, cli.no_times),
         pattern: cli.pattern,
         exclude: cli.exclude,
-        no_ignore: cli.no_ignore.then_some(true),
-        no_icons: cli.no_icons.then_some(true),
-        no_color: cli.no_color.then_some(true),
-        dirs_only: cli.dirs_only.then_some(true),
-        files_only: cli.files_only.then_some(true),
+        no_ignore: bool_override(cli.no_ignore, cli.ignore),
+        no_icons: bool_override(cli.no_icons, cli.icons),
+        no_color: bool_override(cli.no_color, cli.color),
+        dirs_only: if cli.files_only {
+            Some(false)
+        } else {
+            cli.dirs_only.then_some(true)
+        },
+        files_only: if cli.dirs_only {
+            Some(false)
+        } else {
+            cli.files_only.then_some(true)
+        },
         sort: cli.sort,
     };
     let opts = merge_config(cli_config, config);
@@ -168,6 +217,15 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn bool_override(enable: bool, disable: bool) -> Option<bool> {
+    match (enable, disable) {
+        (true, true) => None,
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        (false, false) => None,
+    }
 }
 
 fn apply_pattern_filter(

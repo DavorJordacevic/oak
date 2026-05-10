@@ -65,7 +65,7 @@ If `XDG_CONFIG_HOME` is not set, Oak uses:
 ~/.config/oak/config
 ```
 
-Future `oak` runs automatically use the saved defaults. Pass `--no-config` to ignore the saved config for one command.
+Future `oak` runs automatically use the saved defaults. Any flag you pass on a later command overrides the saved value for that setting. Pass `--no-config` to ignore the saved config for one command.
 
 ## Sorting
 
@@ -81,15 +81,21 @@ Future `oak` runs automatically use the saved defaults. Pass `--no-config` to ig
 ```
 -L, --level <LEVEL>      Maximum display depth
 -a, --all                Show hidden files
+    --hide-hidden        Hide hidden files
 -s, --sizes              Show file sizes
+    --no-sizes           Hide file sizes
 -t, --times              Show modification times
+    --no-times           Hide modification times
 -P, --pattern <PATTERN>  Only show files matching regex
 -I, --exclude <EXCLUDE>  Exclude files matching regex
     --save-config        Save these options as future defaults and exit
     --no-config          Do not read saved config
     --no-ignore          Don't respect .gitignore
+    --ignore             Respect .gitignore
     --no-icons           Disable icons
+    --icons              Enable icons
     --no-color           Plain text output
+    --color              Enable color output
     --dirs-only          Show directories only
     --files-only         Show files only
 -S, --sort <SORT>        Sort order (mtime, name, size, ext)

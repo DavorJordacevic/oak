@@ -228,3 +228,79 @@ fn no_config_bypasses_saved_defaults() {
     );
     assert!(!stdout.contains(".secret"), "stdout was: {stdout}");
 }
+
+#[test]
+fn files_only_flag_overrides_saved_dirs_only() {
+    let root = temp_tree("config-mode-override");
+    let config_home = temp_config_home("config-mode-home");
+    fs::create_dir_all(root.path.join("dir")).expect("failed to create dir");
+    fs::write(root.path.join("file.txt"), "").expect("failed to write file");
+
+    let save = oak()
+        .env("XDG_CONFIG_HOME", &config_home.path)
+        .args(["--dirs-only", "--save-config"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+
+    assert!(
+        save.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&save.stderr)
+    );
+
+    let output = oak()
+        .env("XDG_CONFIG_HOME", &config_home.path)
+        .args(["--files-only"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("file.txt"), "stdout was: {stdout}");
+    assert!(stdout.contains("1 file"), "stdout was: {stdout}");
+    assert!(!stdout.contains("dir/"), "stdout was: {stdout}");
+}
+
+#[test]
+fn icons_flag_overrides_saved_no_icons() {
+    let root = temp_tree("config-icons-override");
+    let config_home = temp_config_home("config-icons-home");
+    fs::write(root.path.join("file.txt"), "").expect("failed to write file");
+
+    let save = oak()
+        .env("XDG_CONFIG_HOME", &config_home.path)
+        .args(["--no-icons", "--save-config"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+
+    assert!(
+        save.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&save.stderr)
+    );
+
+    let output = oak()
+        .env("XDG_CONFIG_HOME", &config_home.path)
+        .args(["--icons"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("\u{1f4dd} file.txt"),
+        "stdout was: {stdout}"
+    );
+}
