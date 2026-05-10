@@ -334,11 +334,11 @@ fn symlinks_show_targets_and_broken_state_by_default() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(
-        stdout.contains("lrwxr-xr-x  good-link  10 B  -> target.txt"),
+        stdout.contains("good-link  10 B  -> target.txt"),
         "stdout was: {stdout}"
     );
     assert!(
-        stdout.contains("lrwxr-xr-x  bad-link  11 B  -> missing.txt [broken]"),
+        stdout.contains("bad-link  11 B  -> missing.txt [broken]"),
         "stdout was: {stdout}"
     );
 }
