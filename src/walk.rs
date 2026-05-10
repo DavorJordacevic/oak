@@ -32,7 +32,7 @@ pub fn walk(
         if ALWAYS_SKIP.contains(&name.as_ref()) {
             return false;
         }
-        if entry.file_type().map_or(false, |ft| ft.is_dir()) {
+        if entry.file_type().is_some_and(|ft| ft.is_dir()) {
             return true;
         }
         if !show_hidden && name.starts_with('.') {
@@ -63,8 +63,8 @@ pub fn walk(
             .to_string_lossy()
             .to_string();
 
-        let is_dir = entry.file_type().map_or(false, |ft| ft.is_dir());
-        let is_symlink = entry.file_type().map_or(false, |ft| ft.is_symlink());
+        let is_dir = entry.file_type().is_some_and(|ft| ft.is_dir());
+        let is_symlink = entry.file_type().is_some_and(|ft| ft.is_symlink());
         let (size, modified) = match entry.metadata() {
             Ok(m) => (m.len(), m.modified().unwrap_or(SystemTime::UNIX_EPOCH)),
             Err(_) => (0, SystemTime::UNIX_EPOCH),

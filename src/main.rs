@@ -1,12 +1,12 @@
 mod icon;
+mod render;
+mod sort;
 mod tree;
 mod walk;
-mod sort;
-mod render;
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 
 use crate::render::RenderOpts;
@@ -46,8 +46,11 @@ struct Cli {
     #[arg(long, help = "Do not respect .gitignore / .ignore files")]
     no_ignore: bool,
 
-    #[arg(long, help = "Disable NerdFont icons")]
+    #[arg(long, help = "Disable icons")]
     no_icons: bool,
+
+    #[arg(long, value_enum, default_value_t, help = "Icon style")]
+    icon_style: icon::IconStyle,
 
     #[arg(long, help = "Output without color")]
     no_color: bool,
@@ -77,12 +80,7 @@ fn main() -> Result<()> {
         anyhow::bail!("Not a directory: {}", root_path.display());
     }
 
-    let entries_by_parent = walk(
-        &root_path,
-        cli.all,
-        cli.level,
-        cli.no_ignore,
-    )?;
+    let entries_by_parent = walk(&root_path, cli.all, cli.level, cli.no_ignore)?;
 
     let mut tree = TreeNode::build(&root_path, &entries_by_parent)
         .ok_or_else(|| anyhow::anyhow!("Failed to build tree"))?;
@@ -91,7 +89,7 @@ fn main() -> Result<()> {
         tree.modified = meta.modified().unwrap_or(tree.modified);
     }
 
-    apply_pattern_filter(&mut tree, cli.pattern.as_deref(), cli.exclude.as_deref());
+    apply_pattern_filter(&mut tree, cli.pattern.as_deref(), cli.exclude.as_deref())?;
 
     sort_nodes(&mut tree, cli.sort);
 
@@ -99,6 +97,7 @@ fn main() -> Result<()> {
         show_sizes: cli.sizes,
         show_times: cli.times,
         show_icons: !cli.no_icons,
+        icon_style: cli.icon_style,
         show_colors: !cli.no_color,
         dirs_only: cli.dirs_only,
         files_only: cli.files_only,
@@ -109,12 +108,23 @@ fn main() -> Result<()> {
     let size_str = render::human_size(total_size);
 
     if !cli.dirs_only && !cli.files_only {
-        let dir_label = if dirs == 1 { "directory" } else { "directories" };
+        let dir_label = if dirs == 1 {
+            "directory"
+        } else {
+            "directories"
+        };
         let file_label = if files == 1 { "file" } else { "files" };
         println!();
-        println!("{} {}, {} {}, {}", dirs, dir_label, files, file_label, size_str);
+        println!(
+            "{} {}, {} {}, {}",
+            dirs, dir_label, files, file_label, size_str
+        );
     } else if cli.dirs_only {
-        let dir_label = if dirs == 1 { "directory" } else { "directories" };
+        let dir_label = if dirs == 1 {
+            "directory"
+        } else {
+            "directories"
+        };
         println!();
         println!("{} {}", dirs, dir_label);
     } else if cli.files_only {
@@ -130,11 +140,16 @@ fn apply_pattern_filter(
     node: &mut TreeNode,
     include: Option<&str>,
     exclude: Option<&str>,
-) {
-    let include_re = include.map(|p| regex::Regex::new(p).unwrap());
-    let exclude_re = exclude.map(|p| regex::Regex::new(p).unwrap());
+) -> Result<()> {
+    let include_re = include
+        .map(|p| regex::Regex::new(p).with_context(|| format!("Invalid include pattern: {p}")))
+        .transpose()?;
+    let exclude_re = exclude
+        .map(|p| regex::Regex::new(p).with_context(|| format!("Invalid exclude pattern: {p}")))
+        .transpose()?;
 
     filter_children(node, &include_re, &exclude_re);
+    Ok(())
 }
 
 fn filter_children(
@@ -146,12 +161,8 @@ fn filter_children(
         if child.is_dir {
             return true;
         }
-        let keep = include
-            .as_ref()
-            .map_or(true, |re| re.is_match(&child.name));
-        let skip = exclude
-            .as_ref()
-            .map_or(false, |re| re.is_match(&child.name));
+        let keep = include.as_ref().is_none_or(|re| re.is_match(&child.name));
+        let skip = exclude.as_ref().is_some_and(|re| re.is_match(&child.name));
         keep && !skip
     });
 

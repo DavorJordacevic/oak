@@ -22,21 +22,15 @@ pub fn sort_nodes(node: &mut TreeNode, sort_by: SortBy) {
             (true, false) => Ordering::Less,
             (false, true) => Ordering::Greater,
             _ => match sort_by {
-                SortBy::Mtime => {
-                    match b.modified.cmp(&a.modified) {
-                        Ordering::Equal => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-                        other => other,
-                    }
-                }
-                SortBy::Name => {
-                    a.name.to_lowercase().cmp(&b.name.to_lowercase())
-                }
-                SortBy::Size => {
-                    match b.size.cmp(&a.size) {
-                        Ordering::Equal => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-                        other => other,
-                    }
-                }
+                SortBy::Mtime => match b.modified.cmp(&a.modified) {
+                    Ordering::Equal => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                    other => other,
+                },
+                SortBy::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                SortBy::Size => match b.size.cmp(&a.size) {
+                    Ordering::Equal => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                    other => other,
+                },
                 SortBy::Ext => {
                     let a_ext = a.name.rsplit('.').next().unwrap_or("").to_lowercase();
                     let b_ext = b.name.rsplit('.').next().unwrap_or("").to_lowercase();
@@ -45,7 +39,7 @@ pub fn sort_nodes(node: &mut TreeNode, sort_by: SortBy) {
                         other => other,
                     }
                 }
-            }
+            },
         }
     });
 

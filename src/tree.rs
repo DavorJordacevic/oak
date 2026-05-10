@@ -31,26 +31,28 @@ impl TreeNode {
             .to_string_lossy()
             .to_string();
 
-        let children = entries_by_parent.get(&root_path).map_or(Vec::new(), |entries| {
-            entries
-                .iter()
-                .filter_map(|entry| {
-                    if entry.is_dir {
-                        Self::build(&entry.path, entries_by_parent)
-                    } else {
-                        Some(TreeNode {
-                            name: entry.name.clone(),
-                            path: entry.path.clone(),
-                            is_dir: false,
-                            is_symlink: entry.is_symlink,
-                            size: entry.size,
-                            modified: entry.modified,
-                            children: Vec::new(),
-                        })
-                    }
-                })
-                .collect()
-        });
+        let children = entries_by_parent
+            .get(&root_path)
+            .map_or(Vec::new(), |entries| {
+                entries
+                    .iter()
+                    .filter_map(|entry| {
+                        if entry.is_dir {
+                            Self::build(&entry.path, entries_by_parent)
+                        } else {
+                            Some(TreeNode {
+                                name: entry.name.clone(),
+                                path: entry.path.clone(),
+                                is_dir: false,
+                                is_symlink: entry.is_symlink,
+                                size: entry.size,
+                                modified: entry.modified,
+                                children: Vec::new(),
+                            })
+                        }
+                    })
+                    .collect()
+            });
 
         Some(TreeNode {
             name: root_name,

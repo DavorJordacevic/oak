@@ -15,7 +15,7 @@ A modern, fast, and beautiful `tree` command.
 The standard `tree` command hasn't evolved in decades. Oak is a ground-up rewrite that makes directory listing actually enjoyable.
 
 - **Git-aware by default** — respects `.gitignore` automatically (no more `node_modules` spam)
-- **Rich icons** — file type icons for 80+ languages and formats
+- **Rich icons** — macOS-friendly Unicode icons by default, with Nerd Font icons available
 - **Smart sorting** — sort by name, size, extension, or modification time
 - **Clean, colorful output** — modern terminal colors that respect `NO_COLOR`
 - **Fast** — built in Rust with parallel gitignore filtering
@@ -63,7 +63,8 @@ oak -P '\.rs$'              # filter by regex
 -P, --pattern <PATTERN>  Only show files matching regex
 -I, --exclude <EXCLUDE>  Exclude files matching regex
     --no-ignore          Don't respect .gitignore
-    --no-icons           Disable file type icons
+    --no-icons           Disable icons
+    --icon-style <STYLE> Icon style (unicode, nerd-font)
     --no-color           Plain text output
     --dirs-only          Show directories only
     --files-only         Show files only
@@ -72,4 +73,4 @@ oak -P '\.rs$'              # filter by regex
 
 ## License
 
-MIT OR Apache-2.0
+MIT OR Apache-2.0. See [LICENSE](LICENSE).

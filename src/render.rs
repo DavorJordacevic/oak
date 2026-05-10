@@ -10,6 +10,7 @@ pub struct RenderOpts {
     pub show_sizes: bool,
     pub show_times: bool,
     pub show_icons: bool,
+    pub icon_style: icon::IconStyle,
     pub show_colors: bool,
     pub dirs_only: bool,
     pub files_only: bool,
@@ -29,18 +30,19 @@ pub fn render(node: &TreeNode, opts: &RenderOpts) -> io::Result<(usize, usize, u
 
     print_root_name(node, opts);
 
-    let child_count = node.children.len();
-    for (i, child) in node.children.iter().enumerate() {
+    let children = visible_children(node, opts);
+    let child_count = children.len();
+    for (i, child) in children.into_iter().enumerate() {
         let is_last = i == child_count - 1;
-        let should_show = match (opts.dirs_only, opts.files_only) {
-            (true, _) => child.is_dir,
-            (_, true) => !child.is_dir,
-            _ => true,
-        };
-
-        if should_show {
-            render_child(child, "", is_last, opts, &mut dir_count, &mut file_count, &mut total_size)?;
-        }
+        render_child(
+            child,
+            "",
+            is_last,
+            opts,
+            &mut dir_count,
+            &mut file_count,
+            &mut total_size,
+        )?;
     }
 
     Ok((dir_count, file_count, total_size))
@@ -48,7 +50,10 @@ pub fn render(node: &TreeNode, opts: &RenderOpts) -> io::Result<(usize, usize, u
 
 fn print_root_name(node: &TreeNode, opts: &RenderOpts) {
     let icon_str = if opts.show_icons {
-        format!("{} ", icon::get_icon(&node.name, node.is_dir, node.is_symlink))
+        format!(
+            "{} ",
+            icon::get_icon(&node.name, node.is_dir, node.is_symlink, opts.icon_style)
+        )
     } else {
         String::new()
     };
@@ -56,10 +61,7 @@ fn print_root_name(node: &TreeNode, opts: &RenderOpts) {
     let line = format!("{}{}", icon_str, name);
 
     if opts.show_colors {
-        print!(
-            "{}",
-            line.if_supports_color(Stdout, |t| t.bright_blue())
-        );
+        print!("{}", line.if_supports_color(Stdout, |t| t.bright_blue()));
     } else {
         print!("{}", line);
     }
@@ -88,7 +90,10 @@ fn render_child(
     };
 
     let icon_str = if opts.show_icons {
-        format!("{} ", icon::get_icon(&node.name, node.is_dir, node.is_symlink))
+        format!(
+            "{} ",
+            icon::get_icon(&node.name, node.is_dir, node.is_symlink, opts.icon_style)
+        )
     } else {
         String::new()
     };
@@ -118,10 +123,7 @@ fn render_child(
 
     if !meta.is_empty() {
         if opts.show_colors {
-            print!(
-                "{}",
-                meta.if_supports_color(Stdout, |t| t.dimmed())
-            );
+            print!("{}", meta.if_supports_color(Stdout, |t| t.dimmed()));
         } else {
             print!("{}", meta);
         }
@@ -136,26 +138,19 @@ fn render_child(
             format!("{}\u{2502}   ", prefix)
         };
 
-        let child_count = node.children.len();
-        for (i, child) in node.children.iter().enumerate() {
+        let children = visible_children(node, opts);
+        let child_count = children.len();
+        for (i, child) in children.into_iter().enumerate() {
             let child_is_last = i == child_count - 1;
-            let should_show = match (opts.dirs_only, opts.files_only) {
-                (true, _) => child.is_dir,
-                (_, true) => !child.is_dir,
-                _ => true,
-            };
-
-            if should_show {
-                render_child(
-                    child,
-                    &child_prefix,
-                    child_is_last,
-                    opts,
-                    dir_count,
-                    file_count,
-                    total_size,
-                )?;
-            }
+            render_child(
+                child,
+                &child_prefix,
+                child_is_last,
+                opts,
+                dir_count,
+                file_count,
+                total_size,
+            )?;
         }
     } else {
         *file_count += 1;
@@ -163,6 +158,28 @@ fn render_child(
     }
 
     Ok(())
+}
+
+fn visible_children<'a>(node: &'a TreeNode, opts: &RenderOpts) -> Vec<&'a TreeNode> {
+    let mut children = Vec::new();
+    collect_visible_children(node, opts, &mut children);
+    children
+}
+
+fn collect_visible_children<'a>(
+    node: &'a TreeNode,
+    opts: &RenderOpts,
+    visible: &mut Vec<&'a TreeNode>,
+) {
+    for child in &node.children {
+        match (opts.dirs_only, opts.files_only, child.is_dir) {
+            (true, _, true) => visible.push(child),
+            (_, true, true) => collect_visible_children(child, opts, visible),
+            (_, true, false) => visible.push(child),
+            (false, false, _) => visible.push(child),
+            _ => {}
+        }
+    }
 }
 
 fn print_colored(line: &str, node: &TreeNode) {
