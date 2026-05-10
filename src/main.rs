@@ -1,4 +1,5 @@
 mod config;
+mod git;
 mod icon;
 mod render;
 mod sort;
@@ -107,6 +108,44 @@ struct Cli {
     #[arg(long, conflicts_with = "dirs_only", help = "Show files only")]
     files_only: bool,
 
+    #[arg(long, conflicts_with = "no_stats", help = "Show statistics")]
+    stats: bool,
+
+    #[arg(long, conflicts_with = "stats", help = "Hide statistics")]
+    no_stats: bool,
+
+    #[arg(long, conflicts_with = "no_links", help = "Show symlink targets")]
+    links: bool,
+
+    #[arg(long, conflicts_with = "links", help = "Hide symlink targets")]
+    no_links: bool,
+
+    #[arg(
+        long,
+        conflicts_with = "no_prune",
+        help = "Prune empty directories after filtering"
+    )]
+    prune: bool,
+
+    #[arg(
+        long,
+        conflicts_with = "prune",
+        help = "Keep empty directories after filtering"
+    )]
+    no_prune: bool,
+
+    #[arg(long, conflicts_with = "no_du", help = "Show directory size rollups")]
+    du: bool,
+
+    #[arg(long, conflicts_with = "du", help = "Hide directory size rollups")]
+    no_du: bool,
+
+    #[arg(long, conflicts_with = "no_git", help = "Show git status")]
+    git: bool,
+
+    #[arg(long, conflicts_with = "git", help = "Hide git status")]
+    no_git: bool,
+
     #[arg(short = 'S', long, value_enum, help = "Sort order")]
     sort: Option<sort::SortBy>,
 }
@@ -138,6 +177,11 @@ fn main() -> Result<()> {
         } else {
             cli.files_only.then_some(true)
         },
+        no_stats: bool_override(cli.no_stats, cli.stats),
+        no_links: bool_override(cli.no_links, cli.links),
+        no_prune: bool_override(cli.no_prune, cli.prune),
+        no_du: bool_override(cli.no_du, cli.du),
+        no_git: bool_override(cli.no_git, cli.git),
         sort: cli.sort,
     };
     let opts = merge_config(cli_config, config);
@@ -174,6 +218,13 @@ fn main() -> Result<()> {
     }
 
     apply_pattern_filter(&mut tree, opts.pattern.as_deref(), opts.exclude.as_deref())?;
+    if opts.prune && (opts.pattern.is_some() || opts.exclude.is_some()) {
+        prune_empty_dirs(&mut tree);
+    }
+
+    if opts.git {
+        git::annotate(&root_path, &mut tree);
+    }
 
     sort_nodes(&mut tree, opts.sort);
 
@@ -184,6 +235,10 @@ fn main() -> Result<()> {
         show_colors: !opts.no_color,
         dirs_only: opts.dirs_only,
         files_only: opts.files_only,
+        show_links: opts.links,
+        show_stats: opts.stats,
+        show_du: opts.du,
+        show_git: opts.git,
     };
 
     let (dirs, files, total_size) = render::render(&tree, &render_opts)?;
@@ -216,6 +271,8 @@ fn main() -> Result<()> {
         println!("{} {}, {}", files, file_label, size_str);
     }
 
+    render::print_stats(&tree, &render_opts);
+
     Ok(())
 }
 
@@ -226,6 +283,16 @@ fn bool_override(enable: bool, disable: bool) -> Option<bool> {
         (false, true) => Some(false),
         (false, false) => None,
     }
+}
+
+fn prune_empty_dirs(node: &mut TreeNode) {
+    for child in &mut node.children {
+        if child.is_dir {
+            prune_empty_dirs(child);
+        }
+    }
+    node.children
+        .retain(|child| !child.is_dir || !child.children.is_empty());
 }
 
 fn apply_pattern_filter(

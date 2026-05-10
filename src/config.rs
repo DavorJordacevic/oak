@@ -17,6 +17,11 @@ pub struct Config {
     pub no_color: Option<bool>,
     pub dirs_only: Option<bool>,
     pub files_only: Option<bool>,
+    pub no_stats: Option<bool>,
+    pub no_links: Option<bool>,
+    pub no_prune: Option<bool>,
+    pub no_du: Option<bool>,
+    pub no_git: Option<bool>,
     pub sort: Option<SortBy>,
 }
 
@@ -33,6 +38,11 @@ pub struct EffectiveConfig {
     pub no_color: bool,
     pub dirs_only: bool,
     pub files_only: bool,
+    pub stats: bool,
+    pub links: bool,
+    pub prune: bool,
+    pub du: bool,
+    pub git: bool,
     pub sort: SortBy,
 }
 
@@ -75,6 +85,11 @@ impl Config {
                 "no_color" => config.no_color = Some(parse_bool(value, idx)?),
                 "dirs_only" => config.dirs_only = Some(parse_bool(value, idx)?),
                 "files_only" => config.files_only = Some(parse_bool(value, idx)?),
+                "no_stats" => config.no_stats = Some(parse_bool(value, idx)?),
+                "no_links" => config.no_links = Some(parse_bool(value, idx)?),
+                "no_prune" => config.no_prune = Some(parse_bool(value, idx)?),
+                "no_du" => config.no_du = Some(parse_bool(value, idx)?),
+                "no_git" => config.no_git = Some(parse_bool(value, idx)?),
                 "sort" => {
                     let sort = parse_string(value, idx)?;
                     config.sort = Some(
@@ -122,6 +137,11 @@ impl EffectiveConfig {
         output.push_str(&format!("no_color = {}\n", self.no_color));
         output.push_str(&format!("dirs_only = {}\n", self.dirs_only));
         output.push_str(&format!("files_only = {}\n", self.files_only));
+        output.push_str(&format!("no_stats = {}\n", !self.stats));
+        output.push_str(&format!("no_links = {}\n", !self.links));
+        output.push_str(&format!("no_prune = {}\n", !self.prune));
+        output.push_str(&format!("no_du = {}\n", !self.du));
+        output.push_str(&format!("no_git = {}\n", !self.git));
         output.push_str(&format!("sort = \"{}\"\n", self.sort.as_str()));
         output
     }
@@ -153,6 +173,11 @@ pub fn merge_config(cli: Config, config: Config) -> EffectiveConfig {
         no_color: cli.no_color.or(config.no_color).unwrap_or(false),
         dirs_only: cli.dirs_only.or(config.dirs_only).unwrap_or(false),
         files_only: cli.files_only.or(config.files_only).unwrap_or(false),
+        stats: !cli.no_stats.or(config.no_stats).unwrap_or(false),
+        links: !cli.no_links.or(config.no_links).unwrap_or(false),
+        prune: !cli.no_prune.or(config.no_prune).unwrap_or(false),
+        du: !cli.no_du.or(config.no_du).unwrap_or(false),
+        git: !cli.no_git.or(config.no_git).unwrap_or(false),
         sort: cli.sort.or(config.sort).unwrap_or_default(),
     }
 }

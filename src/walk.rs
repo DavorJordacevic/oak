@@ -65,6 +65,19 @@ pub fn walk(
 
         let is_dir = entry.file_type().is_some_and(|ft| ft.is_dir());
         let is_symlink = entry.file_type().is_some_and(|ft| ft.is_symlink());
+        let link_target = if is_symlink {
+            std::fs::read_link(&path).ok()
+        } else {
+            None
+        };
+        let link_broken = link_target.as_ref().is_some_and(|target| {
+            let resolved = if target.is_absolute() {
+                target.clone()
+            } else {
+                path.parent().unwrap_or(root).join(target)
+            };
+            !resolved.exists()
+        });
         let (size, modified) = match entry.metadata() {
             Ok(m) => (m.len(), m.modified().unwrap_or(SystemTime::UNIX_EPOCH)),
             Err(_) => (0, SystemTime::UNIX_EPOCH),
@@ -75,6 +88,8 @@ pub fn walk(
             path: path.clone(),
             is_dir,
             is_symlink,
+            link_target,
+            link_broken,
             size,
             modified,
         };

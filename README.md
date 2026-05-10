@@ -17,6 +17,7 @@ The standard `tree` command hasn't evolved in decades. Oak is a ground-up rewrit
 - **Git-aware by default** — respects `.gitignore` automatically (no more `node_modules` spam)
 - **Rich icons** — macOS-friendly Unicode icons
 - **Smart sorting** — sort by name, size, extension, or modification time
+- **Useful context by default** — stats, symlink targets, git status, pruning, and directory size rollups
 - **Clean, colorful output** — modern terminal colors that respect `NO_COLOR`
 - **Fast** — built in Rust with parallel gitignore filtering
 
@@ -44,6 +45,8 @@ oak -S name                  # sort alphabetically
 oak -P '\.rs$'              # filter by regex
 oak -L 2 --no-icons --save-config
 ```
+
+By default Oak also shows symlink targets, broken link markers, git status, directory size rollups, pruned filter results, and a compact statistics footer.
 
 ## Configuration
 
@@ -98,6 +101,16 @@ Future `oak` runs automatically use the saved defaults. Any flag you pass on a l
     --color              Enable color output
     --dirs-only          Show directories only
     --files-only         Show files only
+    --no-stats           Hide statistics
+    --stats              Show statistics
+    --no-links           Hide symlink targets
+    --links              Show symlink targets
+    --no-prune           Keep empty directories after filtering
+    --prune              Prune empty directories after filtering
+    --no-du              Hide directory size rollups
+    --du                 Show directory size rollups
+    --no-git             Hide git status
+    --git                Show git status
 -S, --sort <SORT>        Sort order (mtime, name, size, ext)
 ```
 

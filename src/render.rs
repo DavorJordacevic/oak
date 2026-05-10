@@ -13,6 +13,10 @@ pub struct RenderOpts {
     pub show_colors: bool,
     pub dirs_only: bool,
     pub files_only: bool,
+    pub show_links: bool,
+    pub show_stats: bool,
+    pub show_du: bool,
+    pub show_git: bool,
 }
 
 pub fn render(node: &TreeNode, opts: &RenderOpts) -> io::Result<(usize, usize, u64)> {
@@ -103,8 +107,26 @@ fn render_child(
     if opts.show_sizes && !node.is_dir {
         meta_parts.push(human_size(node.size));
     }
+    if opts.show_du && node.is_dir {
+        meta_parts.push(human_size(node.size));
+    }
     if opts.show_times && !node.is_dir {
         meta_parts.push(relative_time(node.modified));
+    }
+    if opts.show_links
+        && node.is_symlink
+        && let Some(target) = &node.link_target
+    {
+        let mut link = format!("-> {}", target.display());
+        if node.link_broken {
+            link.push_str(" [broken]");
+        }
+        meta_parts.push(link);
+    }
+    if opts.show_git
+        && let Some(status) = &node.git_status
+    {
+        meta_parts.push(status.clone());
     }
     let meta = if meta_parts.is_empty() {
         String::new()
@@ -253,6 +275,78 @@ pub fn human_size(bytes: u64) -> String {
         format!("{} B", bytes)
     } else {
         format!("{:.1} {}", size, UNITS[unit_idx])
+    }
+}
+
+pub fn print_stats(node: &TreeNode, opts: &RenderOpts) {
+    if !opts.show_stats {
+        return;
+    }
+
+    let mut files = Vec::new();
+    collect_files(node, &mut files);
+    if files.is_empty() {
+        return;
+    }
+
+    let mut by_type: Vec<(String, usize, u64)> = type_stats(&files).into_values().collect();
+    by_type.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.0.cmp(&b.0)));
+
+    let mut largest = files;
+    largest.sort_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
+
+    println!();
+    println!("by type:");
+    for (label, count, size) in by_type.into_iter().take(5) {
+        let file_label = if count == 1 { "file" } else { "files" };
+        println!(
+            "  {}  {} {}  {}",
+            label,
+            count,
+            file_label,
+            human_size(size)
+        );
+    }
+
+    println!();
+    println!("largest:");
+    for file in largest.into_iter().take(5) {
+        println!("  {}  {}", file.path.display(), human_size(file.size));
+    }
+}
+
+fn collect_files<'a>(node: &'a TreeNode, files: &mut Vec<&'a TreeNode>) {
+    if !node.is_dir {
+        files.push(node);
+    }
+    for child in &node.children {
+        collect_files(child, files);
+    }
+}
+
+fn type_stats(files: &[&TreeNode]) -> std::collections::HashMap<String, (String, usize, u64)> {
+    let mut stats = std::collections::HashMap::new();
+    for file in files {
+        let label = type_label(&file.name).to_string();
+        let entry = stats.entry(label.clone()).or_insert((label, 0, 0));
+        entry.1 += 1;
+        entry.2 += file.size;
+    }
+    stats
+}
+
+fn type_label(name: &str) -> &'static str {
+    match name.rsplit('.').next().unwrap_or("") {
+        "rs" => "Rust",
+        "md" | "markdown" | "mdx" => "Markdown",
+        "png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "bmp" => "Images",
+        "json" | "yaml" | "yml" | "toml" | "xml" | "ini" | "cfg" | "conf" => "Config",
+        "txt" | "rst" => "Text",
+        "zip" | "tar" | "gz" | "bz2" | "xz" | "7z" | "rar" | "tgz" => "Archives",
+        "mp4" | "mkv" | "webm" | "avi" | "mov" => "Video",
+        "mp3" | "wav" | "flac" | "ogg" | "aac" => "Audio",
+        "" => "Other",
+        _ => "Other",
     }
 }
 

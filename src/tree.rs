@@ -4,10 +4,12 @@ use std::time::SystemTime;
 
 pub struct TreeNode {
     pub name: String,
-    #[allow(dead_code)]
     pub path: PathBuf,
     pub is_dir: bool,
     pub is_symlink: bool,
+    pub link_target: Option<PathBuf>,
+    pub link_broken: bool,
+    pub git_status: Option<String>,
     pub size: u64,
     pub modified: SystemTime,
     pub children: Vec<TreeNode>,
@@ -18,6 +20,8 @@ pub struct RawEntry {
     pub path: PathBuf,
     pub is_dir: bool,
     pub is_symlink: bool,
+    pub link_target: Option<PathBuf>,
+    pub link_broken: bool,
     pub size: u64,
     pub modified: SystemTime,
 }
@@ -31,35 +35,43 @@ impl TreeNode {
             .to_string_lossy()
             .to_string();
 
-        let children = entries_by_parent
-            .get(&root_path)
-            .map_or(Vec::new(), |entries| {
-                entries
-                    .iter()
-                    .filter_map(|entry| {
-                        if entry.is_dir {
-                            Self::build(&entry.path, entries_by_parent)
-                        } else {
-                            Some(TreeNode {
-                                name: entry.name.clone(),
-                                path: entry.path.clone(),
-                                is_dir: false,
-                                is_symlink: entry.is_symlink,
-                                size: entry.size,
-                                modified: entry.modified,
-                                children: Vec::new(),
-                            })
-                        }
-                    })
-                    .collect()
-            });
+        let children: Vec<TreeNode> =
+            entries_by_parent
+                .get(&root_path)
+                .map_or(Vec::new(), |entries| {
+                    entries
+                        .iter()
+                        .filter_map(|entry| {
+                            if entry.is_dir {
+                                Self::build(&entry.path, entries_by_parent)
+                            } else {
+                                Some(TreeNode {
+                                    name: entry.name.clone(),
+                                    path: entry.path.clone(),
+                                    is_dir: false,
+                                    is_symlink: entry.is_symlink,
+                                    link_target: entry.link_target.clone(),
+                                    link_broken: entry.link_broken,
+                                    git_status: None,
+                                    size: entry.size,
+                                    modified: entry.modified,
+                                    children: Vec::new(),
+                                })
+                            }
+                        })
+                        .collect()
+                });
+        let size = children.iter().map(|child| child.size).sum();
 
         Some(TreeNode {
             name: root_name,
             path: root_path,
             is_dir: true,
             is_symlink: false,
-            size: 0,
+            link_target: None,
+            link_broken: false,
+            git_status: None,
+            size,
             modified: SystemTime::UNIX_EPOCH,
             children,
         })
