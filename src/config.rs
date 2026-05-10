@@ -22,6 +22,7 @@ pub struct Config {
     pub no_prune: Option<bool>,
     pub no_du: Option<bool>,
     pub no_git: Option<bool>,
+    pub no_perms: Option<bool>,
     pub sort: Option<SortBy>,
 }
 
@@ -43,6 +44,7 @@ pub struct EffectiveConfig {
     pub prune: bool,
     pub du: bool,
     pub git: bool,
+    pub perms: bool,
     pub sort: SortBy,
 }
 
@@ -90,6 +92,7 @@ impl Config {
                 "no_prune" => config.no_prune = Some(parse_bool(value, idx)?),
                 "no_du" => config.no_du = Some(parse_bool(value, idx)?),
                 "no_git" => config.no_git = Some(parse_bool(value, idx)?),
+                "no_perms" => config.no_perms = Some(parse_bool(value, idx)?),
                 "sort" => {
                     let sort = parse_string(value, idx)?;
                     config.sort = Some(
@@ -142,6 +145,7 @@ impl EffectiveConfig {
         output.push_str(&format!("no_prune = {}\n", !self.prune));
         output.push_str(&format!("no_du = {}\n", !self.du));
         output.push_str(&format!("no_git = {}\n", !self.git));
+        output.push_str(&format!("no_perms = {}\n", !self.perms));
         output.push_str(&format!("sort = \"{}\"\n", self.sort.as_str()));
         output
     }
@@ -164,7 +168,7 @@ pub fn merge_config(cli: Config, config: Config) -> EffectiveConfig {
     EffectiveConfig {
         level: cli.level.or(config.level),
         all: cli.all.or(config.all).unwrap_or(false),
-        sizes: cli.sizes.or(config.sizes).unwrap_or(false),
+        sizes: cli.sizes.or(config.sizes).unwrap_or(true),
         times: cli.times.or(config.times).unwrap_or(false),
         pattern: cli.pattern.or(config.pattern),
         exclude: cli.exclude.or(config.exclude),
@@ -178,6 +182,7 @@ pub fn merge_config(cli: Config, config: Config) -> EffectiveConfig {
         prune: !cli.no_prune.or(config.no_prune).unwrap_or(false),
         du: !cli.no_du.or(config.no_du).unwrap_or(false),
         git: !cli.no_git.or(config.no_git).unwrap_or(false),
+        perms: !cli.no_perms.or(config.no_perms).unwrap_or(false),
         sort: cli.sort.or(config.sort).unwrap_or_default(),
     }
 }

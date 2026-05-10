@@ -1,1 +1,38 @@
-/target
+# Rust build output
+/target/
+
+# Local Cargo/config overrides
+.cargo/config.toml
+.cargo/credentials.toml
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Editor and IDE folders
+.idea/
+.vscode/
+*.code-workspace
+
+# Local environment files
+.env
+.env.*
+
+# Generated coverage/profiling output
+coverage/
+tarpaulin-report.html
+*.profraw
+*.profdata
+
+# Local release/package scratch output
+/dist/
+/release/
+/tmp/

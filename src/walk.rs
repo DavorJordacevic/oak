@@ -2,6 +2,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+#[cfg(unix)]
+use std::os::unix::fs::{FileTypeExt, PermissionsExt};
+
 use anyhow::Result;
 use ignore::WalkBuilder;
 
@@ -82,6 +85,7 @@ pub fn walk(
             Ok(m) => (m.len(), m.modified().unwrap_or(SystemTime::UNIX_EPOCH)),
             Err(_) => (0, SystemTime::UNIX_EPOCH),
         };
+        let permissions = format_permissions(&path, is_dir, is_symlink);
 
         let raw = RawEntry {
             name,
@@ -90,6 +94,7 @@ pub fn walk(
             is_symlink,
             link_target,
             link_broken,
+            permissions,
             size,
             modified,
         };
@@ -103,4 +108,52 @@ pub fn walk(
     }
 
     Ok(entries_by_parent)
+}
+
+#[cfg(unix)]
+fn format_permissions(path: &Path, is_dir: bool, is_symlink: bool) -> String {
+    let file_type = if is_symlink {
+        'l'
+    } else if is_dir {
+        'd'
+    } else {
+        '-'
+    };
+    let mode = std::fs::symlink_metadata(path)
+        .map(|meta| meta.permissions().mode())
+        .unwrap_or(0);
+    let mut output = String::with_capacity(10);
+    output.push(file_type);
+    for bit in [
+        0o400, 0o200, 0o100, 0o040, 0o020, 0o010, 0o004, 0o002, 0o001,
+    ] {
+        let ch = match bit {
+            0o400 | 0o040 | 0o004 => 'r',
+            0o200 | 0o020 | 0o002 => 'w',
+            _ => 'x',
+        };
+        output.push(if mode & bit != 0 { ch } else { '-' });
+    }
+
+    let Ok(meta) = std::fs::symlink_metadata(path) else {
+        return output;
+    };
+    if meta.file_type().is_socket() {
+        output.replace_range(0..1, "s");
+    } else if meta.file_type().is_fifo() {
+        output.replace_range(0..1, "p");
+    }
+    output
+}
+
+#[cfg(not(unix))]
+fn format_permissions(_path: &Path, is_dir: bool, is_symlink: bool) -> String {
+    let file_type = if is_symlink {
+        'l'
+    } else if is_dir {
+        'd'
+    } else {
+        '-'
+    };
+    format!("{file_type}---------")
 }

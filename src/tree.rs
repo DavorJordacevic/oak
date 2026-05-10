@@ -10,6 +10,7 @@ pub struct TreeNode {
     pub link_target: Option<PathBuf>,
     pub link_broken: bool,
     pub git_status: Option<String>,
+    pub permissions: String,
     pub size: u64,
     pub modified: SystemTime,
     pub children: Vec<TreeNode>,
@@ -22,6 +23,7 @@ pub struct RawEntry {
     pub is_symlink: bool,
     pub link_target: Option<PathBuf>,
     pub link_broken: bool,
+    pub permissions: String,
     pub size: u64,
     pub modified: SystemTime,
 }
@@ -43,7 +45,14 @@ impl TreeNode {
                         .iter()
                         .filter_map(|entry| {
                             if entry.is_dir {
-                                Self::build(&entry.path, entries_by_parent)
+                                Self::build(&entry.path, entries_by_parent).map(|mut node| {
+                                    node.is_symlink = entry.is_symlink;
+                                    node.link_target = entry.link_target.clone();
+                                    node.link_broken = entry.link_broken;
+                                    node.permissions = entry.permissions.clone();
+                                    node.modified = entry.modified;
+                                    node
+                                })
                             } else {
                                 Some(TreeNode {
                                     name: entry.name.clone(),
@@ -53,6 +62,7 @@ impl TreeNode {
                                     link_target: entry.link_target.clone(),
                                     link_broken: entry.link_broken,
                                     git_status: None,
+                                    permissions: entry.permissions.clone(),
                                     size: entry.size,
                                     modified: entry.modified,
                                     children: Vec::new(),
@@ -71,6 +81,7 @@ impl TreeNode {
             link_target: None,
             link_broken: false,
             git_status: None,
+            permissions: String::new(),
             size,
             modified: SystemTime::UNIX_EPOCH,
             children,

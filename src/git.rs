@@ -48,6 +48,14 @@ fn annotate_node(root: &Path, node: &mut TreeNode, statuses: &HashMap<PathBuf, S
         && let Some(status) = statuses.get(relative)
     {
         node.git_status = Some(status.clone());
+    } else if node.is_dir
+        && let Ok(relative) = node.path.strip_prefix(root)
+        && !relative.as_os_str().is_empty()
+        && let Some(status) = statuses
+            .iter()
+            .find_map(|(path, status)| path.starts_with(relative).then_some(status))
+    {
+        node.git_status = Some(status.clone());
     }
 
     for child in &mut node.children {

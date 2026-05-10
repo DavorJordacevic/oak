@@ -146,6 +146,15 @@ struct Cli {
     #[arg(long, conflicts_with = "git", help = "Hide git status")]
     no_git: bool,
 
+    #[arg(long, conflicts_with = "no_perms", help = "Show permissions")]
+    perms: bool,
+
+    #[arg(long, conflicts_with = "perms", help = "Hide permissions")]
+    no_perms: bool,
+
+    #[arg(long, help = "Show entries grouped by modification recency")]
+    timeline: bool,
+
     #[arg(short = 'S', long, value_enum, help = "Sort order")]
     sort: Option<sort::SortBy>,
 }
@@ -182,6 +191,7 @@ fn main() -> Result<()> {
         no_prune: bool_override(cli.no_prune, cli.prune),
         no_du: bool_override(cli.no_du, cli.du),
         no_git: bool_override(cli.no_git, cli.git),
+        no_perms: bool_override(cli.no_perms, cli.perms),
         sort: cli.sort,
     };
     let opts = merge_config(cli_config, config);
@@ -239,7 +249,13 @@ fn main() -> Result<()> {
         show_stats: opts.stats,
         show_du: opts.du,
         show_git: opts.git,
+        show_perms: opts.perms,
     };
+
+    if cli.timeline {
+        render::render_timeline(&tree, &render_opts)?;
+        return Ok(());
+    }
 
     let (dirs, files, total_size) = render::render(&tree, &render_opts)?;
 

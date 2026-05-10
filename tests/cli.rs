@@ -93,8 +93,14 @@ fn dirs_only_uses_connectors_from_visible_children() {
         "stderr was: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(stdout.contains("├── a/"), "stdout was: {stdout}");
-    assert!(stdout.contains("└── b/"), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("├── drwxr-xr-x  a/"),
+        "stdout was: {stdout}"
+    );
+    assert!(
+        stdout.contains("└── drwxr-xr-x  b/"),
+        "stdout was: {stdout}"
+    );
 }
 
 #[test]
@@ -328,11 +334,11 @@ fn symlinks_show_targets_and_broken_state_by_default() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(
-        stdout.contains("good-link  -> target.txt"),
+        stdout.contains("lrwxr-xr-x  good-link  10 B  -> target.txt"),
         "stdout was: {stdout}"
     );
     assert!(
-        stdout.contains("bad-link  -> missing.txt [broken]"),
+        stdout.contains("lrwxr-xr-x  bad-link  11 B  -> missing.txt [broken]"),
         "stdout was: {stdout}"
     );
 }
@@ -356,7 +362,10 @@ fn stats_and_directory_sizes_are_on_by_default() {
         "stderr was: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(stdout.contains("src/  13 B"), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("drwxr-xr-x  src/  13 B"),
+        "stdout was: {stdout}"
+    );
     assert!(stdout.contains("by type:"), "stdout was: {stdout}");
     assert!(stdout.contains("Rust"), "stdout was: {stdout}");
     assert!(stdout.contains("Markdown"), "stdout was: {stdout}");
@@ -419,7 +428,81 @@ fn git_status_is_shown_by_default_when_available() {
         "stderr was: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(stdout.contains("new.txt  ?"), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("-rw-r--r--  new.txt  0 B  ??"),
+        "stdout was: {stdout}"
+    );
+}
+
+#[test]
+fn git_status_rolls_up_to_parent_directories() {
+    let root = temp_tree("git-rollup");
+    let init = Command::new("git").args(["init"]).arg(&root.path).output();
+    let Ok(init) = init else {
+        return;
+    };
+    if !init.status.success() {
+        return;
+    }
+
+    fs::create_dir_all(root.path.join("src")).expect("failed to create src");
+    fs::write(root.path.join("src").join("main.rs"), "fn main() {}\n").expect("failed to write");
+    let add = Command::new("git")
+        .args(["-C"])
+        .arg(&root.path)
+        .args(["add", "."])
+        .output()
+        .expect("failed to git add");
+    if !add.status.success() {
+        return;
+    }
+    let commit = Command::new("git")
+        .args(["-C"])
+        .arg(&root.path)
+        .args([
+            "-c",
+            "user.name=Oak Test",
+            "-c",
+            "user.email=oak@example.invalid",
+            "commit",
+            "-m",
+            "initial",
+        ])
+        .output()
+        .expect("failed to git commit");
+    if !commit.status.success() {
+        return;
+    }
+    fs::write(
+        root.path.join("src").join("main.rs"),
+        "fn main() { println!(\"hi\"); }\n",
+    )
+    .expect("failed to modify");
+
+    let output = oak()
+        .args([
+            "--no-config",
+            "--no-color",
+            "--no-icons",
+            "-L",
+            "1",
+            "-S",
+            "name",
+        ])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("drwxr-xr-x  src/  0 B  M"),
+        "stdout was: {stdout}"
+    );
 }
 
 #[test]
@@ -440,6 +523,7 @@ fn saved_config_can_disable_new_default_features() {
             "--no-du",
             "--no-git",
             "--no-prune",
+            "--no-perms",
             "--save-config",
         ])
         .arg(&root.path)
@@ -478,4 +562,101 @@ fn saved_config_can_disable_new_default_features() {
     assert!(config.contains("no_du = true"), "config was: {config}");
     assert!(config.contains("no_git = true"), "config was: {config}");
     assert!(config.contains("no_prune = true"), "config was: {config}");
+    assert!(config.contains("no_perms = true"), "config was: {config}");
+}
+
+#[test]
+#[cfg(unix)]
+fn permissions_are_shown_by_default_and_can_be_disabled() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = temp_tree("perms");
+    let file = root.path.join("run.sh");
+    fs::write(&file, "").expect("failed to write file");
+    fs::set_permissions(&file, fs::Permissions::from_mode(0o755))
+        .expect("failed to set permissions");
+
+    let output = oak()
+        .args(["--no-config", "--no-color", "--no-icons", "-S", "name"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("-rwxr-xr-x  run.sh"),
+        "stdout was: {stdout}"
+    );
+
+    let output = oak()
+        .args([
+            "--no-config",
+            "--no-color",
+            "--no-icons",
+            "--no-perms",
+            "-S",
+            "name",
+        ])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!stdout.contains("-rwxr-xr-x"), "stdout was: {stdout}");
+}
+
+#[test]
+fn timeline_groups_entries_by_recency() {
+    let root = temp_tree("timeline");
+    fs::create_dir_all(root.path.join("src")).expect("failed to create src");
+    fs::write(root.path.join("src").join("main.rs"), "").expect("failed to write file");
+
+    let output = oak()
+        .args(["--no-config", "--no-color", "--no-icons", "--timeline"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("Today:"), "stdout was: {stdout}");
+    assert!(stdout.contains("src/"), "stdout was: {stdout}");
+    assert!(stdout.contains("src/main.rs"), "stdout was: {stdout}");
+    assert!(!stdout.contains("├──"), "stdout was: {stdout}");
+}
+
+#[test]
+fn timeline_respects_color_output() {
+    let root = temp_tree("timeline-color");
+    fs::write(root.path.join("main.rs"), "").expect("failed to write file");
+
+    let output = oak()
+        .env("FORCE_COLOR", "1")
+        .args(["--no-config", "--color", "--timeline"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("\u{1b}["), "stdout was: {stdout:?}");
+    assert!(stdout.contains("Today:"), "stdout was: {stdout}");
 }
