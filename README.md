@@ -73,4 +73,4 @@ oak -P '\.rs$'              # filter by regex
 
 ## License
 
-MIT OR Apache-2.0. See [LICENSE](LICENSE).
+MIT - See [LICENSE](LICENSE).
