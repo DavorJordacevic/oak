@@ -27,6 +27,10 @@ fn temp_tree(name: &str) -> TempTree {
     TempTree { path }
 }
 
+fn temp_config_home(name: &str) -> TempTree {
+    temp_tree(name)
+}
+
 #[test]
 fn invalid_include_regex_returns_clean_error() {
     let output = oak()
@@ -111,20 +115,19 @@ fn default_icons_use_mac_terminal_visible_unicode() {
 }
 
 #[test]
-fn nerd_font_icons_are_available_by_flag() {
+fn icon_style_option_is_not_supported() {
     let output = oak()
         .args(["--no-color", "--icon-style", "nerd-font", "-L", "0", "."])
         .output()
         .expect("failed to run oak");
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
 
+    assert!(!output.status.success());
     assert!(
-        output.status.success(),
-        "stderr was: {}",
-        String::from_utf8_lossy(&output.stderr)
+        stderr.contains("unexpected argument '--icon-style'"),
+        "stderr was: {stderr}"
     );
-    assert!(stdout.contains("\u{f07b}"), "stdout was: {stdout}");
 }
 
 #[test]
@@ -147,4 +150,81 @@ fn unicode_image_icons_use_picture_symbol() {
     );
     assert!(stdout.contains("\u{1f5bc} oak.png"), "stdout was: {stdout}");
     assert!(!stdout.contains("\u{25a7} oak.png"), "stdout was: {stdout}");
+}
+
+#[test]
+fn save_config_writes_defaults_for_future_runs() {
+    let root = temp_tree("config-root");
+    let config_home = temp_config_home("config-home");
+    fs::create_dir_all(root.path.join("hidden")).expect("failed to create hidden dir");
+    fs::write(root.path.join(".secret"), "").expect("failed to write hidden file");
+    fs::write(root.path.join("visible.txt"), "").expect("failed to write visible file");
+
+    let save = oak()
+        .env("XDG_CONFIG_HOME", &config_home.path)
+        .args(["--all", "--no-icons", "--save-config"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+
+    assert!(
+        save.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&save.stderr)
+    );
+
+    let output = oak()
+        .env("XDG_CONFIG_HOME", &config_home.path)
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains(".secret"), "stdout was: {stdout}");
+    assert!(!stdout.contains("\u{1f4c1}"), "stdout was: {stdout}");
+
+    let config_path = config_home.path.join("oak").join("config");
+    let config = fs::read_to_string(config_path).expect("failed to read saved config");
+    assert!(config.contains("all = true"), "config was: {config}");
+    assert!(config.contains("no_icons = true"), "config was: {config}");
+}
+
+#[test]
+fn no_config_bypasses_saved_defaults() {
+    let root = temp_tree("no-config-root");
+    let config_home = temp_config_home("no-config-home");
+    fs::write(root.path.join(".secret"), "").expect("failed to write hidden file");
+
+    let save = oak()
+        .env("XDG_CONFIG_HOME", &config_home.path)
+        .args(["--all", "--save-config"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+
+    assert!(
+        save.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&save.stderr)
+    );
+
+    let output = oak()
+        .env("XDG_CONFIG_HOME", &config_home.path)
+        .args(["--no-config"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!stdout.contains(".secret"), "stdout was: {stdout}");
 }

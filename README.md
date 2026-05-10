@@ -1,6 +1,6 @@
 <div align="center">
 
-![Oak](oak.png)
+![Oak](assets/oak.png)
 
 # Oak
 
@@ -15,7 +15,7 @@ A modern, fast, and beautiful `tree` command.
 The standard `tree` command hasn't evolved in decades. Oak is a ground-up rewrite that makes directory listing actually enjoyable.
 
 - **Git-aware by default** — respects `.gitignore` automatically (no more `node_modules` spam)
-- **Rich icons** — macOS-friendly Unicode icons by default, with Nerd Font icons available
+- **Rich icons** — macOS-friendly Unicode icons
 - **Smart sorting** — sort by name, size, extension, or modification time
 - **Clean, colorful output** — modern terminal colors that respect `NO_COLOR`
 - **Fast** — built in Rust with parallel gitignore filtering
@@ -42,7 +42,30 @@ oak -L 2                     # max depth 2
 oak -a                       # show hidden files
 oak -S name                  # sort alphabetically
 oak -P '\.rs$'              # filter by regex
+oak -L 2 --no-icons --save-config
 ```
+
+## Configuration
+
+Save your preferred options once:
+
+```bash
+oak -L 2 -S name --no-icons --save-config
+```
+
+Oak writes defaults to:
+
+```text
+$XDG_CONFIG_HOME/oak/config
+```
+
+If `XDG_CONFIG_HOME` is not set, Oak uses:
+
+```text
+~/.config/oak/config
+```
+
+Future `oak` runs automatically use the saved defaults. Pass `--no-config` to ignore the saved config for one command.
 
 ## Sorting
 
@@ -62,9 +85,10 @@ oak -P '\.rs$'              # filter by regex
 -t, --times              Show modification times
 -P, --pattern <PATTERN>  Only show files matching regex
 -I, --exclude <EXCLUDE>  Exclude files matching regex
+    --save-config        Save these options as future defaults and exit
+    --no-config          Do not read saved config
     --no-ignore          Don't respect .gitignore
     --no-icons           Disable icons
-    --icon-style <STYLE> Icon style (unicode, nerd-font)
     --no-color           Plain text output
     --dirs-only          Show directories only
     --files-only         Show files only

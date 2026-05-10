@@ -10,7 +10,6 @@ pub struct RenderOpts {
     pub show_sizes: bool,
     pub show_times: bool,
     pub show_icons: bool,
-    pub icon_style: icon::IconStyle,
     pub show_colors: bool,
     pub dirs_only: bool,
     pub files_only: bool,
@@ -52,7 +51,7 @@ fn print_root_name(node: &TreeNode, opts: &RenderOpts) {
     let icon_str = if opts.show_icons {
         format!(
             "{} ",
-            icon::get_icon(&node.name, node.is_dir, node.is_symlink, opts.icon_style)
+            icon::get_icon(&node.name, node.is_dir, node.is_symlink)
         )
     } else {
         String::new()
@@ -92,7 +91,7 @@ fn render_child(
     let icon_str = if opts.show_icons {
         format!(
             "{} ",
-            icon::get_icon(&node.name, node.is_dir, node.is_symlink, opts.icon_style)
+            icon::get_icon(&node.name, node.is_dir, node.is_symlink)
         )
     } else {
         String::new()

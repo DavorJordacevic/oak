@@ -15,6 +15,27 @@ pub enum SortBy {
     Ext,
 }
 
+impl SortBy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SortBy::Mtime => "mtime",
+            SortBy::Name => "name",
+            SortBy::Size => "size",
+            SortBy::Ext => "ext",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "mtime" => Some(SortBy::Mtime),
+            "name" => Some(SortBy::Name),
+            "size" => Some(SortBy::Size),
+            "ext" => Some(SortBy::Ext),
+            _ => None,
+        }
+    }
+}
+
 pub fn sort_nodes(node: &mut TreeNode, sort_by: SortBy) {
     node.children.sort_by(|a, b| {
         // Always group directories before files
