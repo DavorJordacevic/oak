@@ -50,6 +50,8 @@ oak --timeline               # group entries by modification recency
 oak -L 2 --no-icons --save-config
 ```
 
+![Oak example output](assets/oak-example.png)
+
 By default Oak also shows file sizes, permissions, symlink targets, broken link markers, git status, directory size rollups, pruned filter results, and a compact statistics footer.
 
 ## Timeline Mode
