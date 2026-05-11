@@ -27,6 +27,12 @@ The standard `tree` command hasn't evolved in decades. Oak is a ground-up rewrit
 ## Installation
 
 ```bash
+curl -LsSf https://raw.githubusercontent.com/DavorJordacevic/oak/main/install.sh | sh
+```
+
+Or install from source with Cargo:
+
+```bash
 cargo install --path .
 ```
 
