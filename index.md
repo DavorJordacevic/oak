@@ -1,12 +1,10 @@
-<div align="center" markdown="1">
-
-![Oak](assets/oak.png)
+<p align="center">
+  <img src="assets/oak.png" alt="Oak" />
+</p>
 
 # Oak
 
 A modern, fast, and beautiful `tree` command.
-
-</div>
 
 ---
 
