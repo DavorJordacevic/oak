@@ -11,6 +11,9 @@ pub struct Config {
     pub sizes: Option<bool>,
     pub times: Option<bool>,
     pub pattern: Option<String>,
+    pub find: Option<String>,
+    pub find_text: Option<String>,
+    pub clip: Option<bool>,
     pub exclude: Option<String>,
     pub no_ignore: Option<bool>,
     pub no_icons: Option<bool>,
@@ -33,6 +36,9 @@ pub struct EffectiveConfig {
     pub sizes: bool,
     pub times: bool,
     pub pattern: Option<String>,
+    pub find: Option<String>,
+    pub find_text: Option<String>,
+    pub clip: bool,
     pub exclude: Option<String>,
     pub no_ignore: bool,
     pub no_icons: bool,
@@ -81,6 +87,9 @@ impl Config {
                 "sizes" => config.sizes = Some(parse_bool(value, idx)?),
                 "times" => config.times = Some(parse_bool(value, idx)?),
                 "pattern" => config.pattern = Some(parse_string(value, idx)?),
+                "find" => config.find = Some(parse_string(value, idx)?),
+                "find_text" => config.find_text = Some(parse_string(value, idx)?),
+                "clip" => config.clip = Some(parse_bool(value, idx)?),
                 "exclude" => config.exclude = Some(parse_string(value, idx)?),
                 "no_ignore" => config.no_ignore = Some(parse_bool(value, idx)?),
                 "no_icons" => config.no_icons = Some(parse_bool(value, idx)?),
@@ -132,6 +141,12 @@ impl EffectiveConfig {
         if let Some(pattern) = &self.pattern {
             output.push_str(&format!("pattern = \"{}\"\n", escape_string(pattern)));
         }
+        if let Some(find) = &self.find {
+            output.push_str(&format!("find = \"{}\"\n", escape_string(find)));
+        }
+        if let Some(find_text) = &self.find_text {
+            output.push_str(&format!("find_text = \"{}\"\n", escape_string(find_text)));
+        }
         if let Some(exclude) = &self.exclude {
             output.push_str(&format!("exclude = \"{}\"\n", escape_string(exclude)));
         }
@@ -171,6 +186,9 @@ pub fn merge_config(cli: Config, config: Config) -> EffectiveConfig {
         sizes: cli.sizes.or(config.sizes).unwrap_or(true),
         times: cli.times.or(config.times).unwrap_or(false),
         pattern: cli.pattern.or(config.pattern),
+        find: cli.find.or(config.find),
+        find_text: cli.find_text.or(config.find_text),
+        clip: cli.clip.or(config.clip).unwrap_or(false),
         exclude: cli.exclude.or(config.exclude),
         no_ignore: cli.no_ignore.or(config.no_ignore).unwrap_or(false),
         no_icons: cli.no_icons.or(config.no_icons).unwrap_or(false),

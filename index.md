@@ -50,6 +50,9 @@ oak -L 2                     # max depth 2
 oak -a                       # show hidden files
 oak -S name                  # sort alphabetically
 oak -P '\.rs$'              # filter by regex
+oak --find main              # search for files matching name
+oak --find-text "hello"       # search file contents for text
+oak --clip                   # copy output to clipboard
 oak --timeline               # group entries by modification recency
 oak -L 2 --no-icons --save-config
 ```
@@ -119,6 +122,8 @@ Future `oak` runs automatically use the saved defaults. Any flag you pass on a l
     --no-sizes           Hide file sizes
 -t, --times              Show modification times
     --no-times           Hide modification times
+    --find <NAME>         Search for files matching name (case-insensitive)
+    --find-text <TEXT>    Search file contents for text (case-insensitive)
 -P, --pattern <PATTERN>  Only show files matching regex
 -I, --exclude <EXCLUDE>  Exclude files matching regex
     --save-config        Save these options as future defaults and exit
@@ -144,6 +149,7 @@ Future `oak` runs automatically use the saved defaults. Any flag you pass on a l
     --du                 Show directory size rollups
     --no-git             Hide git status
     --git                Show git status
+    --clip                Copy output to clipboard
 -S, --sort <SORT>        Sort order (mtime, name, size, ext)
 ```
 

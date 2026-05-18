@@ -8,10 +8,57 @@ mod walk;
 
 use std::path::PathBuf;
 
+#[cfg(unix)]
+mod capture {
+    use std::io::Read;
+    use std::os::unix::io::FromRawFd;
+
+    const STDOUT: i32 = 1;
+
+    unsafe extern "C" {
+        fn pipe(fds: *mut i32) -> i32;
+        fn dup(fd: i32) -> i32;
+        fn dup2(old: i32, new: i32) -> i32;
+        fn close(fd: i32) -> i32;
+    }
+
+    pub fn stdout<F>(f: F) -> Vec<u8>
+    where
+        F: FnOnce(),
+    {
+        let mut fds: [i32; 2] = [0; 2];
+        unsafe {
+            pipe(fds.as_mut_ptr());
+            let saved = dup(STDOUT);
+            dup2(fds[1], STDOUT);
+            close(fds[1]);
+
+            f();
+
+            dup2(saved, STDOUT);
+            close(saved);
+
+            let mut buf = Vec::new();
+            std::fs::File::from_raw_fd(fds[0])
+                .read_to_end(&mut buf)
+                .ok();
+            buf
+        }
+    }
+}
+
+#[cfg(not(unix))]
+mod capture {
+    pub fn stdout<F: FnOnce()>(f: F) -> Vec<u8> {
+        f();
+        Vec::new()
+    }
+}
+
 use anyhow::{Context, Result};
 use clap::Parser;
 
-use crate::config::{Config, merge_config};
+use crate::config::{Config, EffectiveConfig, merge_config};
 use crate::render::RenderOpts;
 use crate::sort::sort_nodes;
 use crate::tree::TreeNode;
@@ -63,6 +110,15 @@ struct Cli {
 
     #[arg(long, conflicts_with = "times", help = "Hide modification times")]
     no_times: bool,
+
+    #[arg(long, help = "Search for files matching name (substring match)")]
+    find: Option<String>,
+
+    #[arg(long, help = "Copy output to clipboard")]
+    clip: bool,
+
+    #[arg(long, help = "Search for text in file contents")]
+    find_text: Option<String>,
 
     #[arg(short = 'P', long, help = "Only show files matching pattern (regex)")]
     pattern: Option<String>,
@@ -172,6 +228,9 @@ fn main() -> Result<()> {
         sizes: bool_override(cli.sizes, cli.no_sizes),
         times: bool_override(cli.times, cli.no_times),
         pattern: cli.pattern,
+        find: cli.find.clone(),
+        find_text: cli.find_text.clone(),
+        clip: if cli.clip { Some(true) } else { None },
         exclude: cli.exclude,
         no_ignore: bool_override(cli.no_ignore, cli.ignore),
         no_icons: bool_override(cli.no_icons, cli.icons),
@@ -232,6 +291,19 @@ fn main() -> Result<()> {
         prune_empty_dirs(&mut tree);
     }
 
+    if let Some(ref find) = opts.find {
+        apply_find_filter(&mut tree, find);
+        prune_empty_dirs(&mut tree);
+    }
+
+    let text_matches = if let Some(ref text) = opts.find_text {
+        let m = apply_find_text_filter(&mut tree, text)?;
+        prune_empty_dirs(&mut tree);
+        m
+    } else {
+        std::collections::HashMap::new()
+    };
+
     if opts.git {
         git::annotate(&root_path, &mut tree);
     }
@@ -252,44 +324,41 @@ fn main() -> Result<()> {
         show_perms: opts.perms,
     };
 
-    if cli.timeline {
-        render::render_timeline(&tree, &render_opts)?;
-        return Ok(());
+    let render_result = if opts.clip {
+        let captured = capture::stdout(|| {
+            run_render(&tree, &render_opts, cli.timeline, &opts).ok();
+        });
+        let text = String::from_utf8_lossy(&captured);
+        if let Ok(mut cb) = arboard::Clipboard::new() {
+            let _ = cb.set_text(text.as_ref());
+        }
+        print!("{text}");
+        Ok(())
+    } else {
+        run_render(&tree, &render_opts, cli.timeline, &opts)
+    };
+
+    render_result?;
+
+    if !text_matches.is_empty() {
+        print_text_matches(&text_matches);
     }
-
-    let (dirs, files, total_size) = render::render(&tree, &render_opts)?;
-
-    let size_str = render::human_size(total_size);
-
-    if !opts.dirs_only && !opts.files_only {
-        let dir_label = if dirs == 1 {
-            "directory"
-        } else {
-            "directories"
-        };
-        let file_label = if files == 1 { "file" } else { "files" };
-        println!();
-        println!(
-            "{} {}, {} {}, {}",
-            dirs, dir_label, files, file_label, size_str
-        );
-    } else if opts.dirs_only {
-        let dir_label = if dirs == 1 {
-            "directory"
-        } else {
-            "directories"
-        };
-        println!();
-        println!("{} {}", dirs, dir_label);
-    } else if opts.files_only {
-        let file_label = if files == 1 { "file" } else { "files" };
-        println!();
-        println!("{} {}, {}", files, file_label, size_str);
-    }
-
-    render::print_stats(&tree, &render_opts);
 
     Ok(())
+}
+
+fn print_text_matches(matches: &std::collections::HashMap<std::path::PathBuf, Vec<(usize, String)>>) {
+    let mut files: Vec<_> = matches.iter().collect();
+    files.sort_by_key(|(path, _)| (*path).clone());
+
+    for (path, lines) in &files {
+        println!();
+        let display = path.display();
+        println!("─── {display} ───");
+        for (num, content) in lines.iter() {
+            println!("  {num:>4} | {content}");
+        }
+    }
 }
 
 fn bool_override(enable: bool, disable: bool) -> Option<bool> {
@@ -324,6 +393,168 @@ fn apply_pattern_filter(
         .transpose()?;
 
     filter_children(node, &include_re, &exclude_re);
+    Ok(())
+}
+
+fn apply_find_filter(node: &mut TreeNode, find: &str) {
+    for child in &mut node.children {
+        if child.is_dir {
+            apply_find_filter(child, find);
+        }
+    }
+
+    let find_lower = find.to_lowercase();
+    node.children.retain(|child| {
+        let name_lower = child.name.to_lowercase();
+        let name_matches = name_lower.contains(&find_lower);
+        if child.is_dir {
+            name_matches || !child.children.is_empty()
+        } else {
+            name_matches
+        }
+    });
+}
+
+type TextMatches = std::collections::HashMap<std::path::PathBuf, Vec<(usize, String)>>;
+
+fn apply_find_text_filter(node: &mut TreeNode, text: &str) -> Result<TextMatches> {
+    let total = count_file_leaves(node);
+
+    let (matching_paths, match_details) = if total > 0 {
+        let pb = indicatif::ProgressBar::new(total as u64);
+        pb.set_draw_target(indicatif::ProgressDrawTarget::stderr());
+        pb.set_style(
+            indicatif::ProgressStyle::default_bar()
+                .template("{spinner:.green} [{bar:20.cyan/blue}] {pos}/{len} files searching...")
+                .unwrap()
+                .progress_chars("█▓▒░"),
+        );
+
+        let (paths, details) = scan_files(node, text, &pb);
+        pb.finish_and_clear();
+        (paths, details)
+    } else {
+        (std::collections::HashSet::new(), TextMatches::new())
+    };
+
+    if total > 0 && matching_paths.is_empty() {
+        eprintln!("No files contain \"{text}\"");
+    }
+
+    filter_to_matching(node, &matching_paths);
+    Ok(match_details)
+}
+
+fn count_file_leaves(node: &TreeNode) -> usize {
+    if node.is_dir {
+        node.children.iter().map(|c| count_file_leaves(c)).sum()
+    } else {
+        1
+    }
+}
+
+fn scan_files(
+    node: &TreeNode,
+    text: &str,
+    pb: &indicatif::ProgressBar,
+) -> (std::collections::HashSet<std::path::PathBuf>, TextMatches) {
+    let mut path_matches = std::collections::HashSet::new();
+    let mut detail_matches = TextMatches::new();
+    let text_lower = text.to_lowercase();
+    scan_recurse(node, &text_lower, pb, &mut path_matches, &mut detail_matches);
+    (path_matches, detail_matches)
+}
+
+fn scan_recurse(
+    node: &TreeNode,
+    text: &str,
+    pb: &indicatif::ProgressBar,
+    path_matches: &mut std::collections::HashSet<std::path::PathBuf>,
+    detail_matches: &mut TextMatches,
+) {
+    if node.is_dir {
+        for child in &node.children {
+            scan_recurse(child, text, pb, path_matches, detail_matches);
+        }
+    } else {
+        pb.inc(1);
+        if let Ok(content) = std::fs::read_to_string(&node.path) {
+            let lower = content.to_lowercase();
+            if lower.contains(text) {
+                path_matches.insert(node.path.clone());
+                let lines: Vec<(usize, String)> = content
+                    .lines()
+                    .enumerate()
+                    .filter(|(_, line)| line.to_lowercase().contains(text))
+                    .map(|(i, line)| (i + 1, line.to_string()))
+                    .collect();
+                detail_matches.insert(node.path.clone(), lines);
+            }
+        }
+    }
+}
+
+fn filter_to_matching(
+    node: &mut TreeNode,
+    matches: &std::collections::HashSet<std::path::PathBuf>,
+) {
+    for child in &mut node.children {
+        if child.is_dir {
+            filter_to_matching(child, matches);
+        }
+    }
+    node.children.retain(|child| {
+        if child.is_dir {
+            !child.children.is_empty()
+        } else {
+            matches.contains(&child.path)
+        }
+    });
+}
+
+fn run_render(
+    tree: &TreeNode,
+    render_opts: &RenderOpts,
+    timeline: bool,
+    opts: &EffectiveConfig,
+) -> Result<()> {
+    if timeline {
+        render::render_timeline(tree, render_opts)?;
+        return Ok(());
+    }
+
+    let (dirs, files, total_size) = render::render(tree, render_opts)?;
+
+    let size_str = render::human_size(total_size);
+
+    if !opts.dirs_only && !opts.files_only {
+        let dir_label = if dirs == 1 {
+            "directory"
+        } else {
+            "directories"
+        };
+        let file_label = if files == 1 { "file" } else { "files" };
+        println!();
+        println!(
+            "{} {}, {} {}, {}",
+            dirs, dir_label, files, file_label, size_str
+        );
+    } else if opts.dirs_only {
+        let dir_label = if dirs == 1 {
+            "directory"
+        } else {
+            "directories"
+        };
+        println!();
+        println!("{} {}", dirs, dir_label);
+    } else if opts.files_only {
+        let file_label = if files == 1 { "file" } else { "files" };
+        println!();
+        println!("{} {}, {}", files, file_label, size_str);
+    }
+
+    render::print_stats(tree, render_opts);
+
     Ok(())
 }
 

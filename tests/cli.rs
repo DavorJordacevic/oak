@@ -660,3 +660,143 @@ fn timeline_respects_color_output() {
     assert!(stdout.contains("\u{1b}["), "stdout was: {stdout:?}");
     assert!(stdout.contains("Today:"), "stdout was: {stdout}");
 }
+
+#[test]
+fn clip_copies_output() {
+    let root = temp_tree("clip");
+    fs::write(root.path.join("hello.txt"), "world").expect("failed to write file");
+    fs::write(root.path.join("other.md"), "content").expect("failed to write file");
+
+    let output = oak()
+        .args(["--no-config", "--no-color", "--no-icons", "--clip", "-S", "name"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("hello.txt"),
+        "stdout should contain the tree, was: {stdout}"
+    );
+    assert!(
+        stdout.contains("other.md"),
+        "stdout should contain the tree, was: {stdout}"
+    );
+}
+
+#[test]
+fn find_shows_only_matching_files() {
+    let root = temp_tree("find");
+    fs::create_dir_all(root.path.join("src")).expect("failed to create src dir");
+    fs::create_dir_all(root.path.join("docs")).expect("failed to create docs dir");
+    fs::create_dir_all(root.path.join("target")).expect("failed to create target dir");
+    fs::write(root.path.join("src").join("main.rs"), "").expect("failed to write main.rs");
+    fs::write(root.path.join("src").join("lib.rs"), "").expect("failed to write lib.rs");
+    fs::write(root.path.join("docs").join("guide.md"), "").expect("failed to write guide.md");
+    fs::write(root.path.join("README.md"), "").expect("failed to write readme");
+
+    let output = oak()
+        .args(["--no-config", "--no-color", "--no-icons", "--find", "main", "-S", "name"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("src/"), "stdout was: {stdout}");
+    assert!(stdout.contains("main.rs"), "stdout was: {stdout}");
+    assert!(!stdout.contains("lib.rs"), "stdout was: {stdout}");
+    assert!(!stdout.contains("docs/"), "stdout was: {stdout}");
+    assert!(!stdout.contains("target/"), "stdout was: {stdout}");
+    assert!(!stdout.contains("README.md"), "stdout was: {stdout}");
+    assert!(!stdout.contains("guide.md"), "stdout was: {stdout}");
+}
+
+#[test]
+fn find_is_case_insensitive() {
+    let root = temp_tree("find-case");
+    fs::create_dir_all(root.path.join("Src")).expect("failed to create Src dir");
+    fs::write(root.path.join("Src").join("Main.Rs"), "").expect("failed to write Main.Rs");
+    fs::write(root.path.join("README.md"), "").expect("failed to write README");
+
+    let output = oak()
+        .args(["--no-config", "--no-color", "--no-icons", "--find", "main", "-S", "name"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("Src/"), "stdout was: {stdout}");
+    assert!(stdout.contains("Main.Rs"), "stdout was: {stdout}");
+    assert!(!stdout.contains("README.md"), "stdout was: {stdout}");
+}
+
+#[test]
+fn find_text_shows_files_containing_search_text() {
+    let root = temp_tree("find-text");
+    fs::create_dir_all(root.path.join("src")).expect("failed to create src dir");
+    fs::create_dir_all(root.path.join("docs")).expect("failed to create docs dir");
+    fs::write(root.path.join("src").join("main.rs"), "fn main() { println!(\"hello\"); }")
+        .expect("failed to write main.rs");
+    fs::write(root.path.join("src").join("lib.rs"), "pub fn helper() {}")
+        .expect("failed to write lib.rs");
+    fs::write(root.path.join("docs").join("guide.md"), "# Guide\nhello world")
+        .expect("failed to write guide.md");
+    fs::write(root.path.join("README.md"), "# Project\nwelcome").expect("failed to write readme");
+
+    let output = oak()
+        .args(["--no-config", "--no-color", "--no-icons", "--find-text", "hello", "-S", "name"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("src/"), "stdout was: {stdout}");
+    assert!(stdout.contains("main.rs"), "stdout was: {stdout}");
+    assert!(!stdout.contains("lib.rs"), "stdout was: {stdout}");
+    assert!(stdout.contains("docs/"), "stdout was: {stdout}");
+    assert!(stdout.contains("guide.md"), "stdout was: {stdout}");
+    assert!(!stdout.contains("README.md"), "stdout was: {stdout}");
+}
+
+#[test]
+fn find_text_is_case_insensitive() {
+    let root = temp_tree("find-text-ci");
+    fs::write(root.path.join("HELLO.txt"), "Hello World").expect("failed to write file");
+    fs::write(root.path.join("bye.txt"), "goodbye").expect("failed to write file");
+
+    let output = oak()
+        .args(["--no-config", "--no-color", "--no-icons", "--find-text", "hello", "-S", "name"])
+        .arg(&root.path)
+        .output()
+        .expect("failed to run oak");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("HELLO.txt"), "stdout was: {stdout}");
+    assert!(!stdout.contains("bye.txt"), "stdout was: {stdout}");
+}
