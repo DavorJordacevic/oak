@@ -81,6 +81,35 @@ Last week:
   legacy/
 ```
 
+## Find Text Mode
+
+Search file contents and show only matching files with highlighted match locations:
+
+```bash
+oak --find-text "TODO"
+```
+
+<pre>
+oak/
+├── src/
+│   └── main.rs
+└── docs/
+    └── guide.md
+
+─── src/main.rs ───
+    42 |   // <font color="red">TODO</font>: refactor this
+    89 |   // <font color="red">TODO</font>: add tests
+
+─── docs/guide.md ───
+    15 | ## <font color="red">TODO</font>
+</pre>
+
+- Case-insensitive substring matching
+- Shows file path, line number, and matching line content
+- Matching text is highlighted in <font color="red">bright red</font> in the terminal
+- Respects `--no-color` and `NO_COLOR`
+- Progress bar shown during scanning for large trees
+
 ## Configuration
 
 Save your preferred options once:
