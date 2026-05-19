@@ -340,14 +340,19 @@ fn main() -> Result<()> {
 
     render_result?;
 
-    if !text_matches.is_empty() {
-        print_text_matches(&text_matches);
+    if let Some(ref text) = opts.find_text {
+        if !text_matches.is_empty() {
+            print_text_matches(&text_matches, text);
+        }
     }
 
     Ok(())
 }
 
-fn print_text_matches(matches: &std::collections::HashMap<std::path::PathBuf, Vec<(usize, String)>>) {
+fn print_text_matches(
+    matches: &std::collections::HashMap<std::path::PathBuf, Vec<(usize, String)>>,
+    search: &str,
+) {
     let mut files: Vec<_> = matches.iter().collect();
     files.sort_by_key(|(path, _)| (*path).clone());
 
@@ -356,7 +361,33 @@ fn print_text_matches(matches: &std::collections::HashMap<std::path::PathBuf, Ve
         let display = path.display();
         println!("─── {display} ───");
         for (num, content) in lines.iter() {
-            println!("  {num:>4} | {content}");
+            print!("  {num:>4} | ");
+            highlight_text(content, search);
+            println!();
+        }
+    }
+}
+
+fn highlight_text(content: &str, search: &str) {
+    use owo_colors::{OwoColorize, Stream::Stdout};
+
+    let search_lower: Vec<char> = search.to_lowercase().chars().collect();
+    let chars: Vec<char> = content.chars().collect();
+    let lower: Vec<char> = content.to_lowercase().chars().collect();
+
+    let mut i = 0;
+    while i < chars.len() {
+        if i + search_lower.len() <= lower.len()
+            && lower[i..i + search_lower.len()] == search_lower[..]
+        {
+            let matched: String = chars[i..i + search_lower.len()].iter().collect();
+            let styled = matched.if_supports_color(Stdout, |t| t.bright_red());
+            let bold_styled = format!("{}", styled);
+            print!("{bold_styled}");
+            i += search_lower.len();
+        } else {
+            print!("{}", chars[i]);
+            i += 1;
         }
     }
 }
