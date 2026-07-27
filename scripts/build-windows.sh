@@ -6,6 +6,7 @@ echo "Building Oak for Windows"
 
 target="x86_64-pc-windows-msvc"
 archive="oak-windows-x86_64.zip"
+mkdir -p dist
 
 if [ "$(uname -s)" = "Windows" ] || [ -n "${MSYSTEM:-}" ]; then
     echo "=> Building natively on Windows..."
@@ -31,7 +32,6 @@ else
             exit 1
         }
     fi
-    mkdir -p dist
     cp "target/$target/release/oak.exe" dist/
 fi
 

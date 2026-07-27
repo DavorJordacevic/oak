@@ -7,6 +7,22 @@ case "$OS" in
     Darwin)
         echo "Building natively on macOS..."
         cargo build --release
+        cargo run --release --bin gen-man -- man
+        mkdir -p dist
+        case "$(uname -m)" in
+            x86_64) ARCH="x86_64" ;;
+            arm64) ARCH="aarch64" ;;
+            *)
+                echo "Unsupported macOS architecture: $(uname -m)"
+                exit 1
+                ;;
+        esac
+        STAGE_DIR=$(mktemp -d)
+        trap 'rm -rf "$STAGE_DIR"' EXIT
+        cp target/release/oak README.md LICENSE man/oak.1 "$STAGE_DIR/"
+        ARCHIVE="dist/oak-macos-${ARCH}.tar.gz"
+        tar -czf "$ARCHIVE" -C "$STAGE_DIR" oak README.md LICENSE oak.1
+        echo "   -> $ARCHIVE"
         ;;
     Linux)
         echo "Cross-compiling for macOS from Linux..."

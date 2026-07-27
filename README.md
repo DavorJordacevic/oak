@@ -26,22 +26,50 @@ The standard `tree` command hasn't evolved in decades. Oak is a ground-up rewrit
 
 ## Installation
 
+### Set up from GitHub (recommended)
+
+Use `setup.sh` when you want the latest published Oak release and do not need to edit its source. It downloads a prebuilt binary for your platform; Rust is not required.
+
 ```bash
 curl -LsSf https://raw.githubusercontent.com/DavorJordacevic/oak/main/setup.sh | sh
 ```
 
-Or install from source with Cargo:
+By default, the setup installs to `~/.local/bin` (or `/usr/local/bin` when writable). To choose another directory:
 
 ```bash
-cargo install --path .
+curl -LsSf https://raw.githubusercontent.com/DavorJordacevic/oak/main/setup.sh | OAK_INSTALL_DIR="$HOME/bin" sh
 ```
 
-Or copy the binary directly:
+Run the same setup command again whenever you want to update to the newest GitHub release.
+
+### Build and install a local checkout
+
+Use this when you have cloned the repository, are developing Oak, or want to install changes that are not in a GitHub release yet. This requires Rust and Cargo.
 
 ```bash
+cargo install --path . --locked
+```
+
+After changing local source, rerun the command to rebuild and replace your installed local copy.
+
+## Build from Scratch
+
+Use these scripts only when you are building Oak from source or preparing release archives. They require the Rust stable toolchain (`rustup` and `cargo`). They create release archives in `dist/`; they do not install Oak. To install the locally built source instead, use `cargo install --path . --locked`.
+
+| Platform | Command | Result |
+|---|---|---|
+| Linux | `./scripts/build-linux.sh` | `dist/oak-linux-x86_64.tar.gz` or `dist/oak-linux-aarch64.tar.gz` |
+| macOS | `./scripts/build-macos.sh` | `dist/oak-macos-x86_64.tar.gz` or `dist/oak-macos-aarch64.tar.gz` |
+| Windows (Git Bash) | `./scripts/build-windows.sh` | `dist/oak-windows-x86_64.zip` |
+
+On Windows, run the script from Git Bash with the Rust MSVC toolchain installed. If you are using PowerShell instead, build directly:
+
+```powershell
 cargo build --release
-cp target/release/oak ~/.local/bin/
+Copy-Item target\release\oak.exe "$HOME\.local\bin\oak.exe"
 ```
+
+`setup.sh` is not a build script: use it for a published GitHub release. `build-all.sh` is for release maintainers attempting cross-platform builds from one Unix host; it needs extra cross-compilation tooling and clears `dist/` before it starts, so do not use it for normal local development.
 
 ## Usage
 

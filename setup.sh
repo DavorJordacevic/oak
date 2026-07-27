@@ -42,7 +42,6 @@ MINGW*|MSYS*|CYGWIN*)
     ;;
 esac
 
-# -------- check helper tools --------
 require_cmd() {
     command -v "$1" >/dev/null 2>&1 || {
         echo "Error: '$1' is required but not found. Install it and try again."
@@ -55,7 +54,6 @@ if [ "$EXT" = "zip" ]; then
     require_cmd unzip
 fi
 
-# -------- get download URL from latest GitHub release --------
 echo "Fetching latest release..."
 RELEASE_URL="https://api.github.com/repos/$REPO/releases/latest"
 
@@ -72,14 +70,12 @@ if [ -z "$LATEST_URL" ]; then
     exit 1
 fi
 
-# -------- download --------
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
 echo "Downloading $TARGET..."
 curl -sL "$LATEST_URL" -o "$TMPDIR/$TARGET"
 
-# -------- extract --------
 echo "Extracting..."
 if [ "$EXT" = "zip" ]; then
     unzip -qo "$TMPDIR/$TARGET" -d "$TMPDIR"
@@ -87,7 +83,6 @@ else
     tar -xzf "$TMPDIR/$TARGET" -C "$TMPDIR"
 fi
 
-# -------- pick install dir --------
 if [ -n "${OAK_INSTALL_DIR:-}" ]; then
     INSTALL_DIR="$OAK_INSTALL_DIR"
 else
@@ -103,12 +98,10 @@ else
 fi
 mkdir -p "$INSTALL_DIR"
 
-# -------- install binary --------
 echo "Installing to $INSTALL_DIR/$BIN..."
 cp "$TMPDIR/$BIN" "$INSTALL_DIR/$BIN"
 chmod +x "$INSTALL_DIR/$BIN" 2>/dev/null || true
 
-# -------- install man page --------
 if [ "$IS_WINDOWS" -eq 0 ]; then
     MAN_DIR=""
     for d in "$HOME/.local/share/man/man1" "/usr/local/share/man/man1" "/usr/share/man/man1"; do
@@ -124,7 +117,6 @@ if [ "$IS_WINDOWS" -eq 0 ]; then
     fi
 fi
 
-# -------- verify --------
 echo
 if "$INSTALL_DIR/$BIN" --version 2>/dev/null; then
     echo "=> Oak installed successfully!"
@@ -132,7 +124,6 @@ else
     echo "=> Oak installed successfully!"
 fi
 
-# -------- PATH reminder --------
 case ":$PATH:" in
 *":$INSTALL_DIR:"*) ;;
 *)
