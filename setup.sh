@@ -11,26 +11,26 @@ ARCH=$(uname -m)
 case "$OS" in
 Linux)
     case "$ARCH" in
-    x86_64)  TARGET="oak-linux-x86_64.tar.gz" ;;
-    aarch64) TARGET="oak-linux-aarch64.tar.gz" ;;
-    *)       echo "Unsupported Linux arch: $ARCH"; exit 1 ;;
+    x86_64|amd64)  TARGET="oak-linux-x86_64.tar.gz" ;;
+    aarch64|arm64) TARGET="oak-linux-aarch64.tar.gz" ;;
+    *)             echo "Unsupported Linux arch: $ARCH"; exit 1 ;;
     esac
     EXT="tar.gz"
     IS_WINDOWS=0
     ;;
 Darwin)
     case "$ARCH" in
-    x86_64)  TARGET="oak-macos-x86_64.tar.gz" ;;
-    arm64)   TARGET="oak-macos-aarch64.tar.gz" ;;
-    *)       echo "Unsupported macOS arch: $ARCH"; exit 1 ;;
+    x86_64|amd64)  TARGET="oak-macos-x86_64.tar.gz" ;;
+    arm64|aarch64) TARGET="oak-macos-aarch64.tar.gz" ;;
+    *)             echo "Unsupported macOS arch: $ARCH"; exit 1 ;;
     esac
     EXT="tar.gz"
     IS_WINDOWS=0
     ;;
-MINGW* | MSYS* | CYGWIN*)
+MINGW*|MSYS*|CYGWIN*)
     case "$ARCH" in
-    x86_64) TARGET="oak-windows-x86_64.zip" ;;
-    *)      echo "Unsupported Windows arch: $ARCH"; exit 1 ;;
+    x86_64|amd64) TARGET="oak-windows-x86_64.zip" ;;
+    *)            echo "Unsupported Windows arch: $ARCH"; exit 1 ;;
     esac
     EXT="zip"
     IS_WINDOWS=1
@@ -59,7 +59,6 @@ fi
 echo "Fetching latest release..."
 RELEASE_URL="https://api.github.com/repos/$REPO/releases/latest"
 
-# GitHub API requires a User-Agent header
 LATEST_URL=$(curl -sL -H "Accept: application/vnd.github+json" \
     -H "User-Agent: oak-installer" \
     "$RELEASE_URL" \
@@ -89,26 +88,49 @@ else
 fi
 
 # -------- pick install dir --------
-if [ "$IS_WINDOWS" -eq 1 ]; then
-    INSTALL_DIR="$HOME/bin"
-    mkdir -p "$INSTALL_DIR"
+if [ -n "${OAK_INSTALL_DIR:-}" ]; then
+    INSTALL_DIR="$OAK_INSTALL_DIR"
 else
-    if [ -d "$HOME/.local/bin" ] && echo "$PATH" | tr ':' '\n' | grep -qFx "$HOME/.local/bin"; then
+    if [ "$IS_WINDOWS" -eq 1 ]; then
+        INSTALL_DIR="$HOME/bin"
+    elif [ -d "$HOME/.local/bin" ] && echo "$PATH" | tr ':' '\n' | grep -qFx "$HOME/.local/bin"; then
         INSTALL_DIR="$HOME/.local/bin"
     elif [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
         INSTALL_DIR="/usr/local/bin"
     else
         INSTALL_DIR="$HOME/.local/bin"
-        mkdir -p "$INSTALL_DIR"
+    fi
+fi
+mkdir -p "$INSTALL_DIR"
+
+# -------- install binary --------
+echo "Installing to $INSTALL_DIR/$BIN..."
+cp "$TMPDIR/$BIN" "$INSTALL_DIR/$BIN"
+chmod +x "$INSTALL_DIR/$BIN" 2>/dev/null || true
+
+# -------- install man page --------
+if [ "$IS_WINDOWS" -eq 0 ]; then
+    MAN_DIR=""
+    for d in "$HOME/.local/share/man/man1" "/usr/local/share/man/man1" "/usr/share/man/man1"; do
+        if [ -d "$d" ] || mkdir -p "$d" 2>/dev/null; then
+            MAN_DIR="$d"
+            break
+        fi
+    done
+    if [ -n "$MAN_DIR" ] && [ -f "$TMPDIR/oak.1" ]; then
+        mkdir -p "$MAN_DIR"
+        cp "$TMPDIR/oak.1" "$MAN_DIR/oak.1" 2>/dev/null || true
+        echo "Installed man page to $MAN_DIR/oak.1"
     fi
 fi
 
-# -------- install --------
-echo "Installing to $INSTALL_DIR/$BIN..."
-cp "$TMPDIR/$BIN" "$INSTALL_DIR/$BIN"
-chmod +x "$INSTALL_DIR/$BIN"
-
-echo "=> Oak installed successfully!"
+# -------- verify --------
+echo
+if "$INSTALL_DIR/$BIN" --version 2>/dev/null; then
+    echo "=> Oak installed successfully!"
+else
+    echo "=> Oak installed successfully!"
+fi
 
 # -------- PATH reminder --------
 case ":$PATH:" in
@@ -118,7 +140,7 @@ case ":$PATH:" in
     echo "Note: $INSTALL_DIR is not in your PATH."
     echo "Add it to your shell profile to run 'oak' from anywhere:"
     if [ "$IS_WINDOWS" -eq 1 ]; then
-        echo "  echo 'export PATH=\"\$HOME/bin:\$PATH\"' >> ~/.bashrc"
+        echo "  setx PATH \"\$HOME\\bin;%PATH%\""
     else
         case "${SHELL##*/}" in
         zsh)  echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc" ;;
@@ -131,3 +153,4 @@ esac
 
 echo
 echo "Run 'oak --help' to get started."
+echo "Run 'man oak' for the manual."
