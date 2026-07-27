@@ -1,10 +1,8 @@
 <div align="center" markdown="1">
 
-![Oak](assets/oak.png)
+![Oak](assets/oak-files.png)
 
 # Oak
-
-[![codecov](https://codecov.io/gh/DavorJordacevic/oak/branch/main/graph/badge.svg)](https://codecov.io/gh/DavorJordacevic/oak)
 
 A modern, fast, and beautiful `tree` command.
 
