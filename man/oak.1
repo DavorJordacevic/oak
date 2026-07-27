@@ -1,0 +1,164 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH oak 1  "oak 0.1.0" 
+.SH NAME
+oak \- A modern, fast, gitignore\-aware directory listing
+.SH SYNOPSIS
+\fBoak\fR [\fB\-L\fR|\fB\-\-level\fR] [\fB\-a\fR|\fB\-\-all\fR] [\fB\-\-hide\-hidden\fR] [\fB\-s\fR|\fB\-\-sizes\fR] [\fB\-\-no\-sizes\fR] [\fB\-t\fR|\fB\-\-times\fR] [\fB\-\-no\-times\fR] [\fB\-\-find\fR] [\fB\-\-clip\fR] [\fB\-\-find\-text\fR] [\fB\-P\fR|\fB\-\-pattern\fR] [\fB\-I\fR|\fB\-\-exclude\fR] [\fB\-\-save\-config\fR] [\fB\-\-no\-config\fR] [\fB\-\-no\-ignore\fR] [\fB\-\-ignore\fR] [\fB\-\-no\-icons\fR] [\fB\-\-icons\fR] [\fB\-\-no\-color\fR] [\fB\-\-color\fR] [\fB\-\-dirs\-only\fR] [\fB\-\-files\-only\fR] [\fB\-\-stats\fR] [\fB\-\-no\-stats\fR] [\fB\-\-links\fR] [\fB\-\-no\-links\fR] [\fB\-\-prune\fR] [\fB\-\-no\-prune\fR] [\fB\-\-du\fR] [\fB\-\-no\-du\fR] [\fB\-\-git\fR] [\fB\-\-no\-git\fR] [\fB\-\-git\-blame\fR] [\fB\-\-no\-git\-blame\fR] [\fB\-\-perms\fR] [\fB\-\-no\-perms\fR] [\fB\-\-timeline\fR] [\fB\-S\fR|\fB\-\-sort\fR] [\fB\-\-json\fR] [\fB\-\-csv\fR] [\fB\-\-graph\fR] [\fB\-\-md\fR] [\fB\-\-html\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fIPATH\fR] 
+.SH DESCRIPTION
+A modern, fast, gitignore\-aware directory listing
+.SH OPTIONS
+.TP
+\fB\-L\fR, \fB\-\-level\fR \fI<LEVEL>\fR
+Maximum display depth
+.TP
+\fB\-a\fR, \fB\-\-all\fR
+Show hidden files
+.TP
+\fB\-\-hide\-hidden\fR
+Hide hidden files
+.TP
+\fB\-s\fR, \fB\-\-sizes\fR
+Show file sizes
+.TP
+\fB\-\-no\-sizes\fR
+Hide file sizes
+.TP
+\fB\-t\fR, \fB\-\-times\fR
+Show modification times
+.TP
+\fB\-\-no\-times\fR
+Hide modification times
+.TP
+\fB\-\-find\fR \fI<FIND>\fR
+Search for files matching name (fuzzy match)
+.TP
+\fB\-\-clip\fR
+Copy output to clipboard
+.TP
+\fB\-\-find\-text\fR \fI<FIND_TEXT>\fR
+Search for text in file contents
+.TP
+\fB\-P\fR, \fB\-\-pattern\fR \fI<PATTERN>\fR
+Only show files matching pattern (regex)
+.TP
+\fB\-I\fR, \fB\-\-exclude\fR \fI<EXCLUDE>\fR
+Exclude files matching pattern (regex)
+.TP
+\fB\-\-save\-config\fR
+Save these options as future defaults and exit
+.TP
+\fB\-\-no\-config\fR
+Do not read saved config
+.TP
+\fB\-\-no\-ignore\fR
+Do not respect .gitignore / .ignore files
+.TP
+\fB\-\-ignore\fR
+Respect .gitignore / .ignore files
+.TP
+\fB\-\-no\-icons\fR
+Disable icons
+.TP
+\fB\-\-icons\fR
+Enable icons
+.TP
+\fB\-\-no\-color\fR
+Output without color
+.TP
+\fB\-\-color\fR
+Enable color output
+.TP
+\fB\-\-dirs\-only\fR
+Show directories only
+.TP
+\fB\-\-files\-only\fR
+Show files only
+.TP
+\fB\-\-stats\fR
+Show statistics
+.TP
+\fB\-\-no\-stats\fR
+Hide statistics
+.TP
+\fB\-\-links\fR
+Show symlink targets
+.TP
+\fB\-\-no\-links\fR
+Hide symlink targets
+.TP
+\fB\-\-prune\fR
+Prune empty directories after filtering
+.TP
+\fB\-\-no\-prune\fR
+Keep empty directories after filtering
+.TP
+\fB\-\-du\fR
+Show directory size rollups
+.TP
+\fB\-\-no\-du\fR
+Hide directory size rollups
+.TP
+\fB\-\-git\fR
+Show git status
+.TP
+\fB\-\-no\-git\fR
+Hide git status
+.TP
+\fB\-\-git\-blame\fR
+Show last committer per file
+.TP
+\fB\-\-no\-git\-blame\fR
+Hide last committer per file
+.TP
+\fB\-\-perms\fR
+Show permissions
+.TP
+\fB\-\-no\-perms\fR
+Hide permissions
+.TP
+\fB\-\-timeline\fR
+Show entries grouped by modification recency
+.TP
+\fB\-S\fR, \fB\-\-sort\fR \fI<SORT>\fR
+Sort order
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+mtime: Sort by last modified time (most recent first)
+.IP \(bu 2
+name: Sort alphabetically by name
+.IP \(bu 2
+size: Sort by file size (largest first)
+.IP \(bu 2
+ext: Sort by file extension
+.RE
+.TP
+\fB\-\-json\fR
+Export tree as JSON
+.TP
+\fB\-\-csv\fR
+Export tree as CSV
+.TP
+\fB\-\-graph\fR
+Export tree as Graphviz DOT for piping to dot
+.TP
+\fB\-\-md\fR
+Export tree as Markdown list
+.TP
+\fB\-\-html\fR
+Export tree as HTML nested list
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.TP
+[\fIPATH\fR] [default: .]
+
+.SH VERSION
+v0.1.0
