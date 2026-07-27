@@ -6,8 +6,6 @@ mod sort;
 mod tree;
 mod walk;
 
-use std::path::PathBuf;
-
 #[cfg(unix)]
 mod capture {
     use std::io::Read;
@@ -57,163 +55,15 @@ mod capture {
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use fuzzy_matcher::FuzzyMatcher;
+use oak::cli::Cli;
+use rayon::prelude::*;
 
 use crate::config::{Config, EffectiveConfig, merge_config};
 use crate::render::RenderOpts;
 use crate::sort::sort_nodes;
 use crate::tree::TreeNode;
 use crate::walk::walk;
-
-#[derive(Parser)]
-#[command(name = "oak")]
-#[command(
-    version,
-    about = "A modern, fast, gitignore-aware directory listing",
-    long_about = None
-)]
-struct Cli {
-    #[arg(default_value = ".")]
-    path: PathBuf,
-
-    #[arg(short = 'L', long, help = "Maximum display depth")]
-    level: Option<usize>,
-
-    #[arg(
-        short = 'a',
-        long,
-        conflicts_with = "hide_hidden",
-        help = "Show hidden files"
-    )]
-    all: bool,
-
-    #[arg(long, conflicts_with = "all", help = "Hide hidden files")]
-    hide_hidden: bool,
-
-    #[arg(
-        short = 's',
-        long,
-        conflicts_with = "no_sizes",
-        help = "Show file sizes"
-    )]
-    sizes: bool,
-
-    #[arg(long, conflicts_with = "sizes", help = "Hide file sizes")]
-    no_sizes: bool,
-
-    #[arg(
-        short = 't',
-        long,
-        conflicts_with = "no_times",
-        help = "Show modification times"
-    )]
-    times: bool,
-
-    #[arg(long, conflicts_with = "times", help = "Hide modification times")]
-    no_times: bool,
-
-    #[arg(long, help = "Search for files matching name (substring match)")]
-    find: Option<String>,
-
-    #[arg(long, help = "Copy output to clipboard")]
-    clip: bool,
-
-    #[arg(long, help = "Search for text in file contents")]
-    find_text: Option<String>,
-
-    #[arg(short = 'P', long, help = "Only show files matching pattern (regex)")]
-    pattern: Option<String>,
-
-    #[arg(short = 'I', long, help = "Exclude files matching pattern (regex)")]
-    exclude: Option<String>,
-
-    #[arg(long, help = "Save these options as future defaults and exit")]
-    save_config: bool,
-
-    #[arg(long, help = "Do not read saved config")]
-    no_config: bool,
-
-    #[arg(
-        long,
-        conflicts_with = "ignore",
-        help = "Do not respect .gitignore / .ignore files"
-    )]
-    no_ignore: bool,
-
-    #[arg(
-        long,
-        conflicts_with = "no_ignore",
-        help = "Respect .gitignore / .ignore files"
-    )]
-    ignore: bool,
-
-    #[arg(long, conflicts_with = "icons", help = "Disable icons")]
-    no_icons: bool,
-
-    #[arg(long, conflicts_with = "no_icons", help = "Enable icons")]
-    icons: bool,
-
-    #[arg(long, conflicts_with = "color", help = "Output without color")]
-    no_color: bool,
-
-    #[arg(long, conflicts_with = "no_color", help = "Enable color output")]
-    color: bool,
-
-    #[arg(long, conflicts_with = "files_only", help = "Show directories only")]
-    dirs_only: bool,
-
-    #[arg(long, conflicts_with = "dirs_only", help = "Show files only")]
-    files_only: bool,
-
-    #[arg(long, conflicts_with = "no_stats", help = "Show statistics")]
-    stats: bool,
-
-    #[arg(long, conflicts_with = "stats", help = "Hide statistics")]
-    no_stats: bool,
-
-    #[arg(long, conflicts_with = "no_links", help = "Show symlink targets")]
-    links: bool,
-
-    #[arg(long, conflicts_with = "links", help = "Hide symlink targets")]
-    no_links: bool,
-
-    #[arg(
-        long,
-        conflicts_with = "no_prune",
-        help = "Prune empty directories after filtering"
-    )]
-    prune: bool,
-
-    #[arg(
-        long,
-        conflicts_with = "prune",
-        help = "Keep empty directories after filtering"
-    )]
-    no_prune: bool,
-
-    #[arg(long, conflicts_with = "no_du", help = "Show directory size rollups")]
-    du: bool,
-
-    #[arg(long, conflicts_with = "du", help = "Hide directory size rollups")]
-    no_du: bool,
-
-    #[arg(long, conflicts_with = "no_git", help = "Show git status")]
-    git: bool,
-
-    #[arg(long, conflicts_with = "git", help = "Hide git status")]
-    no_git: bool,
-
-    #[arg(long, conflicts_with = "no_perms", help = "Show permissions")]
-    perms: bool,
-
-    #[arg(long, conflicts_with = "perms", help = "Hide permissions")]
-    no_perms: bool,
-
-    #[arg(long, help = "Show entries grouped by modification recency")]
-    timeline: bool,
-
-    #[arg(short = 'S', long, value_enum, help = "Sort order")]
-    sort: Option<sort::SortBy>,
-}
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -250,6 +100,7 @@ fn main() -> Result<()> {
         no_prune: bool_override(cli.no_prune, cli.prune),
         no_du: bool_override(cli.no_du, cli.du),
         no_git: bool_override(cli.no_git, cli.git),
+        no_git_blame: bool_override(cli.no_git_blame, cli.git_blame),
         no_perms: bool_override(cli.no_perms, cli.perms),
         sort: cli.sort,
     };
@@ -308,7 +159,32 @@ fn main() -> Result<()> {
         git::annotate(&root_path, &mut tree);
     }
 
+    if opts.git_blame {
+        git::blame(&root_path, &mut tree);
+    }
+
     sort_nodes(&mut tree, opts.sort);
+
+    if cli.json {
+        print_json(&tree);
+        return Ok(());
+    }
+    if cli.csv {
+        print_csv(&tree);
+        return Ok(());
+    }
+    if cli.graph {
+        print_graph(&tree);
+        return Ok(());
+    }
+    if cli.md {
+        print_markdown(&tree);
+        return Ok(());
+    }
+    if cli.html {
+        print_html(&tree);
+        return Ok(());
+    }
 
     let render_opts = RenderOpts {
         show_sizes: opts.sizes,
@@ -321,6 +197,7 @@ fn main() -> Result<()> {
         show_stats: opts.stats,
         show_du: opts.du,
         show_git: opts.git,
+        show_git_blame: opts.git_blame,
         show_perms: opts.perms,
     };
 
@@ -340,10 +217,10 @@ fn main() -> Result<()> {
 
     render_result?;
 
-    if let Some(ref text) = opts.find_text {
-        if !text_matches.is_empty() {
-            print_text_matches(&text_matches, text);
-        }
+    if let Some(ref text) = opts.find_text
+        && !text_matches.is_empty()
+    {
+        print_text_matches(&text_matches, text);
     }
 
     Ok(())
@@ -434,10 +311,9 @@ fn apply_find_filter(node: &mut TreeNode, find: &str) {
         }
     }
 
-    let find_lower = find.to_lowercase();
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
     node.children.retain(|child| {
-        let name_lower = child.name.to_lowercase();
-        let name_matches = name_lower.contains(&find_lower);
+        let name_matches = matcher.fuzzy_match(&child.name, find).is_some();
         if child.is_dir {
             name_matches || !child.children.is_empty()
         } else {
@@ -461,8 +337,33 @@ fn apply_find_text_filter(node: &mut TreeNode, text: &str) -> Result<TextMatches
                 .progress_chars("█▓▒░"),
         );
 
-        let (paths, details) = scan_files(node, text, &pb);
+        let file_paths: Vec<std::path::PathBuf> = collect_file_paths(node);
+        let text_lower = text.to_lowercase();
+
+        let results: Vec<(std::path::PathBuf, Vec<(usize, String)>)> = file_paths
+            .par_iter()
+            .filter_map(|path| {
+                pb.inc(1);
+                if let Ok(content) = std::fs::read_to_string(path) {
+                    let lower = content.to_lowercase();
+                    if lower.contains(&text_lower) {
+                        let lines: Vec<(usize, String)> = content
+                            .lines()
+                            .enumerate()
+                            .filter(|(_, line)| line.to_lowercase().contains(&text_lower))
+                            .map(|(i, line)| (i + 1, line.to_string()))
+                            .collect();
+                        return Some((path.clone(), lines));
+                    }
+                }
+                None
+            })
+            .collect();
+
         pb.finish_and_clear();
+
+        let paths: std::collections::HashSet<_> = results.iter().map(|(p, _)| p.clone()).collect();
+        let details: TextMatches = results.into_iter().collect();
         (paths, details)
     } else {
         (std::collections::HashSet::new(), TextMatches::new())
@@ -476,52 +377,27 @@ fn apply_find_text_filter(node: &mut TreeNode, text: &str) -> Result<TextMatches
     Ok(match_details)
 }
 
-fn count_file_leaves(node: &TreeNode) -> usize {
+fn collect_file_paths(node: &TreeNode) -> Vec<std::path::PathBuf> {
+    let mut paths = Vec::new();
+    collect_file_paths_recurse(node, &mut paths);
+    paths
+}
+
+fn collect_file_paths_recurse(node: &TreeNode, paths: &mut Vec<std::path::PathBuf>) {
     if node.is_dir {
-        node.children.iter().map(|c| count_file_leaves(c)).sum()
+        for child in &node.children {
+            collect_file_paths_recurse(child, paths);
+        }
     } else {
-        1
+        paths.push(node.path.clone());
     }
 }
 
-fn scan_files(
-    node: &TreeNode,
-    text: &str,
-    pb: &indicatif::ProgressBar,
-) -> (std::collections::HashSet<std::path::PathBuf>, TextMatches) {
-    let mut path_matches = std::collections::HashSet::new();
-    let mut detail_matches = TextMatches::new();
-    let text_lower = text.to_lowercase();
-    scan_recurse(node, &text_lower, pb, &mut path_matches, &mut detail_matches);
-    (path_matches, detail_matches)
-}
-
-fn scan_recurse(
-    node: &TreeNode,
-    text: &str,
-    pb: &indicatif::ProgressBar,
-    path_matches: &mut std::collections::HashSet<std::path::PathBuf>,
-    detail_matches: &mut TextMatches,
-) {
+fn count_file_leaves(node: &TreeNode) -> usize {
     if node.is_dir {
-        for child in &node.children {
-            scan_recurse(child, text, pb, path_matches, detail_matches);
-        }
+        node.children.iter().map(count_file_leaves).sum()
     } else {
-        pb.inc(1);
-        if let Ok(content) = std::fs::read_to_string(&node.path) {
-            let lower = content.to_lowercase();
-            if lower.contains(text) {
-                path_matches.insert(node.path.clone());
-                let lines: Vec<(usize, String)> = content
-                    .lines()
-                    .enumerate()
-                    .filter(|(_, line)| line.to_lowercase().contains(text))
-                    .map(|(i, line)| (i + 1, line.to_string()))
-                    .collect();
-                detail_matches.insert(node.path.clone(), lines);
-            }
-        }
+        1
     }
 }
 
@@ -608,4 +484,145 @@ fn filter_children(
             filter_children(child, include, exclude);
         }
     }
+}
+
+fn print_json(node: &TreeNode) {
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&node_to_json(node)).unwrap()
+    );
+}
+
+fn node_to_json(node: &TreeNode) -> serde_json::Value {
+    let mut obj = serde_json::json!({
+        "name": node.name,
+        "path": node.path.to_string_lossy(),
+        "size": node.size,
+    });
+    if node.is_dir {
+        let children: Vec<_> = node.children.iter().map(node_to_json).collect();
+        obj["type"] = serde_json::json!("directory");
+        obj["children"] = serde_json::json!(children);
+    } else {
+        obj["type"] = serde_json::json!("file");
+    }
+    obj
+}
+
+fn print_csv(node: &TreeNode) {
+    println!("path,name,type,size");
+    print_csv_recurse(node);
+}
+
+fn print_csv_recurse(node: &TreeNode) {
+    let type_name = if node.is_dir { "directory" } else { "file" };
+    let escaped_path = node.path.to_string_lossy().replace('"', "\"\"");
+    let escaped_name = node.name.replace('"', "\"\"");
+    println!(
+        "\"{escaped_path}\",\"{escaped_name}\",{type_name},{}",
+        node.size
+    );
+    if node.is_dir {
+        for child in &node.children {
+            print_csv_recurse(child);
+        }
+    }
+}
+
+fn print_graph(node: &TreeNode) {
+    println!("digraph oak {{");
+    println!("  rankdir=LR;");
+    println!("  node [shape=box style=filled];");
+    print_graph_recurse(node, &mut 0);
+    println!("}}");
+}
+
+fn print_graph_recurse(node: &TreeNode, next_id: &mut usize) {
+    let id = *next_id;
+    *next_id += 1;
+    let shape = if node.is_dir {
+        "shape=folder fillcolor=lightblue"
+    } else {
+        "shape=note fillcolor=white"
+    };
+    let name = escape_dot(&node.name);
+    println!("  n{id} [label=\"{name}\", {shape}];");
+    for child in &node.children {
+        let child_id = *next_id;
+        println!("  n{id} -> n{child_id};");
+        print_graph_recurse(child, next_id);
+    }
+}
+
+fn print_markdown(node: &TreeNode) {
+    println!("# {}", node.name);
+    for child in &node.children {
+        print_markdown_recurse(child, "");
+    }
+}
+
+fn print_markdown_recurse(node: &TreeNode, indent: &str) {
+    let icon = if node.is_dir { "📁" } else { "📄" };
+    let name = if node.is_dir {
+        format!("{}/", node.name)
+    } else {
+        node.name.clone()
+    };
+    println!("{indent}- {icon} {name}");
+    if node.is_dir {
+        let child_indent = format!("{indent}  ");
+        for child in &node.children {
+            print_markdown_recurse(child, &child_indent);
+        }
+    }
+}
+
+fn print_html(node: &TreeNode) {
+    println!("<!DOCTYPE html>");
+    println!(
+        "<html><head><meta charset=\"utf-8\"><title>{}</title></head>",
+        escape_html(&node.name)
+    );
+    println!("<body>");
+    println!("<h1>{}</h1>", escape_html(&node.name));
+    println!("<ul>");
+    for child in &node.children {
+        print_html_recurse(child);
+    }
+    println!("</ul>");
+    println!("</body></html>");
+}
+
+fn print_html_recurse(node: &TreeNode) {
+    let name = if node.is_dir {
+        format!("{}/", node.name)
+    } else {
+        node.name.clone()
+    };
+    if node.is_dir {
+        println!("<li>{}", escape_html(&name));
+        println!("<ul>");
+        for child in &node.children {
+            print_html_recurse(child);
+        }
+        println!("</ul>");
+        println!("</li>");
+    } else {
+        let size = render::human_size(node.size);
+        println!("<li>{} <small>({size})</small></li>", escape_html(&name));
+    }
+}
+
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+fn escape_dot(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
 }

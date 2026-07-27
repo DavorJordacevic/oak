@@ -9,6 +9,10 @@ license = "MIT OR Apache-2.0"
 name = "oak"
 path = "src/main.rs"
 
+[[bin]]
+name = "gen-man"
+path = "src/bin/gen-man.rs"
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 ignore = "0.4"
@@ -17,6 +21,10 @@ anyhow = "1"
 regex = "1"
 arboard = "3"
 indicatif = "0.17"
+fuzzy-matcher = "0.3"
+rayon = "1"
+serde_json = "1"
+clap_mangen = "0.2"
 
 [profile.release]
 opt-level = 3

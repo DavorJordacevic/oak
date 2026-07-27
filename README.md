@@ -4,6 +4,8 @@
 
 # Oak
 
+[![codecov](https://codecov.io/gh/DavorJordacevic/oak/branch/main/graph/badge.svg)](https://codecov.io/gh/DavorJordacevic/oak)
+
 A modern, fast, and beautiful `tree` command.
 
 </div>
@@ -62,6 +64,16 @@ oak -L 2 --no-icons --save-config
 ![Oak example output](assets/oak-example.png)
 
 By default Oak also shows file sizes, permissions, symlink targets, broken link markers, git status, directory size rollups, pruned filter results, and a compact statistics footer.
+
+## Graph Export
+
+Oak can render a directory tree as a Graphviz diagram:
+
+```bash
+oak --no-config --graph . | dot -Tsvg > assets/oak-graph.svg
+```
+
+![Graph export of the Oak repository](assets/oak-graph.svg)
 
 ## Timeline Mode
 
