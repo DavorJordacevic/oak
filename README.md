@@ -1,6 +1,6 @@
 <div align="center" markdown="1">
 
-![Oak](assets/oak-files.png)
+![Oak](assets/oak.png)
 
 # Oak
 
@@ -26,50 +26,22 @@ The standard `tree` command hasn't evolved in decades. Oak is a ground-up rewrit
 
 ## Installation
 
-### Set up from GitHub (recommended)
-
-Use `setup.sh` when you want the latest published Oak release and do not need to edit its source. It downloads a prebuilt binary for your platform; Rust is not required.
-
 ```bash
-curl -LsSf https://raw.githubusercontent.com/DavorJordacevic/oak/main/setup.sh | sh
+curl -LsSf https://raw.githubusercontent.com/DavorJordacevic/oak/main/install.sh | sh
 ```
 
-By default, the setup installs to `~/.local/bin` (or `/usr/local/bin` when writable). To choose another directory:
+Or install from source with Cargo:
 
 ```bash
-curl -LsSf https://raw.githubusercontent.com/DavorJordacevic/oak/main/setup.sh | OAK_INSTALL_DIR="$HOME/bin" sh
+cargo install --path .
 ```
 
-Run the same setup command again whenever you want to update to the newest GitHub release.
-
-### Build and install a local checkout
-
-Use this when you have cloned the repository, are developing Oak, or want to install changes that are not in a GitHub release yet. This requires Rust and Cargo.
+Or copy the binary directly:
 
 ```bash
-cargo install --path . --locked
-```
-
-After changing local source, rerun the command to rebuild and replace your installed local copy.
-
-## Build from Scratch
-
-Use these scripts only when you are building Oak from source or preparing release archives. They require the Rust stable toolchain (`rustup` and `cargo`). They create release archives in `dist/`; they do not install Oak. To install the locally built source instead, use `cargo install --path . --locked`.
-
-| Platform | Command | Result |
-|---|---|---|
-| Linux | `./scripts/build-linux.sh` | `dist/oak-linux-x86_64.tar.gz` or `dist/oak-linux-aarch64.tar.gz` |
-| macOS | `./scripts/build-macos.sh` | `dist/oak-macos-x86_64.tar.gz` or `dist/oak-macos-aarch64.tar.gz` |
-| Windows (Git Bash) | `./scripts/build-windows.sh` | `dist/oak-windows-x86_64.zip` |
-
-On Windows, run the script from Git Bash with the Rust MSVC toolchain installed. If you are using PowerShell instead, build directly:
-
-```powershell
 cargo build --release
-Copy-Item target\release\oak.exe "$HOME\.local\bin\oak.exe"
+cp target/release/oak ~/.local/bin/
 ```
-
-`setup.sh` is not a build script: use it for a published GitHub release. `build-all.sh` is for release maintainers attempting cross-platform builds from one Unix host; it needs extra cross-compilation tooling and clears `dist/` before it starts, so do not use it for normal local development.
 
 ## Usage
 
@@ -81,27 +53,16 @@ oak -a                       # show hidden files
 oak -S name                  # sort alphabetically
 oak -P '\.rs$'              # filter by regex
 oak --find main              # search for files matching name
-oak --find-text "hello"       # search file contents for text
+oak --find-text "hello"       # search file contents for text (substring)
+oak --find-regex 'TODO|fix'  # search file contents using a regex
 oak --clip                   # copy output to clipboard
 oak --timeline               # group entries by modification recency
-oak --json                   # export as JSON
-oak --graph | dot -Tsvg -o tree.svg  # export as Graphviz SVG
 oak -L 2 --no-icons --save-config
 ```
 
 ![Oak example output](assets/oak-example.png)
 
 By default Oak also shows file sizes, permissions, symlink targets, broken link markers, git status, directory size rollups, pruned filter results, and a compact statistics footer.
-
-## Graph Export
-
-Oak can render a directory tree as a Graphviz diagram:
-
-```bash
-oak --no-config --graph . | dot -Tsvg > assets/oak-graph.svg
-```
-
-![Graph export of the Oak repository](assets/oak-graph.svg)
 
 ## Timeline Mode
 
@@ -144,13 +105,28 @@ oak/
 
 ─── docs/guide.md ───
     15 | ## <font color="red">TODO</font>
+
+3 match(es) in 2 file(s) for "TODO"
 </pre>
 
 - Case-insensitive substring matching
 - Shows file path, line number, and matching line content
-- Matching text is highlighted in <font color="red">bright red</font> in the terminal
+- Every match on a line is highlighted in <font color="red">bright red</font>
+- A summary line reports the total number of matches and files
+- Binary files are detected (via NUL bytes) and skipped automatically
 - Respects `--no-color` and `NO_COLOR`
 - Progress bar shown during scanning for large trees
+
+### Regex search
+
+For more powerful queries, use `--find-regex` with a Rust regular expression
+(case-insensitive, like substring search):
+
+```bash
+oak --find-regex 'TODO|fixme|XXX'
+```
+
+All matches across every line are highlighted, and the same summary line is shown.
 
 ## Configuration
 
@@ -174,80 +150,56 @@ If `XDG_CONFIG_HOME` is not set, Oak uses:
 
 Future `oak` runs automatically use the saved defaults. Any flag you pass on a later command overrides the saved value for that setting. Pass `--no-config` to ignore the saved config for one command.
 
+## Sorting
+
+| Flag | Description |
+|------|-------------|
+| `-S mtime` | **Default** — most recently modified first |
+| `-S name` | Alphabetically |
+| `-S size` | Largest first |
+| `-S ext` | By file extension |
+
 ## Options
 
-### Display
-
-| Flag | Description |
-|------|-------------|
-| `-L, --level <LEVEL>` | Maximum display depth |
-| `-a, --all` | Show hidden files |
-| `--hide-hidden` | Hide hidden files |
-| `-s, --sizes` | Show file sizes |
-| `--no-sizes` | Hide file sizes |
-| `-t, --times` | Show modification times |
-| `--no-times` | Hide modification times |
-| `-S, --sort <SORT>` | Sort order: `mtime` (default), `name`, `size`, `ext` |
-| `--no-icons` | Disable icons |
-| `--icons` | Enable icons |
-| `--no-color` | Output without color |
-| `--color` | Enable color output |
-| `--dirs-only` | Show directories only |
-| `--files-only` | Show files only |
-| `--timeline` | Group entries by modification recency |
-
-### Permissions & Metadata
-
-| Flag | Description |
-|------|-------------|
-| `--perms` | Show file permissions |
-| `--no-perms` | Hide permissions |
-| `--links` | Show symlink targets |
-| `--no-links` | Hide symlink targets |
-| `--du` | Show directory size rollups |
-| `--no-du` | Hide directory size rollups |
-| `--stats` | Show statistics (by type, largest files) |
-| `--no-stats` | Hide statistics |
-| `--prune` | Prune empty directories after filtering |
-| `--no-prune` | Keep empty directories after filtering |
-
-### Git Integration
-
-| Flag | Description |
-|------|-------------|
-| `--git` | Show git status (`??`, `M`, `A`, etc.) |
-| `--no-git` | Hide git status |
-| `--git-blame` | Show last committer per file |
-| `--no-git-blame` | Hide last committer per file |
-| `--no-ignore` | Do not respect `.gitignore` / `.ignore` |
-| `--ignore` | Respect `.gitignore` / `.ignore` |
-
-### Filtering & Search
-
-| Flag | Description |
-|------|-------------|
-| `-P, --pattern <PATTERN>` | Only show files matching regex |
-| `-I, --exclude <EXCLUDE>` | Exclude files matching regex |
-| `--find <NAME>` | Search for files matching name (case-insensitive, fuzzy) |
-| `--find-text <TEXT>` | Search file contents for text (case-insensitive) |
-| `--clip` | Copy output to clipboard |
-
-### Configuration
-
-| Flag | Description |
-|------|-------------|
-| `--save-config` | Save current options as future defaults and exit |
-| `--no-config` | Ignore saved config for this run |
-
-### Export Formats
-
-| Flag | Description |
-|------|-------------|
-| `--json` | Export tree as JSON |
-| `--csv` | Export tree as CSV |
-| `--graph` | Export tree as Graphviz DOT (pipe to `dot -Tsvg`) |
-| `--md` | Export tree as Markdown nested list |
-| `--html` | Export tree as HTML nested list |
+```
+-L, --level <LEVEL>      Maximum display depth
+-a, --all                Show hidden files
+    --hide-hidden        Hide hidden files
+-s, --sizes              Show file sizes
+    --no-sizes           Hide file sizes
+-t, --times              Show modification times
+    --no-times           Hide modification times
+    --find <NAME>         Search for files matching name (case-insensitive)
+    --find-text <TEXT>    Search file contents for text (case-insensitive substring)
+    --find-regex <PATTERN>  Search file contents using a regex (case-insensitive)
+-P, --pattern <PATTERN>  Only show files matching regex
+-I, --exclude <EXCLUDE>  Exclude files matching regex
+    --save-config        Save these options as future defaults and exit
+    --no-config          Do not read saved config
+    --no-ignore          Don't respect .gitignore
+    --ignore             Respect .gitignore
+    --no-icons           Disable icons
+    --icons              Enable icons
+    --no-color           Plain text output
+    --color              Enable color output
+    --dirs-only          Show directories only
+    --files-only         Show files only
+    --timeline           Show entries grouped by modification recency
+    --no-perms           Hide permissions
+    --perms              Show permissions
+    --no-stats           Hide statistics
+    --stats              Show statistics
+    --no-links           Hide symlink targets
+    --links              Show symlink targets
+    --no-prune           Keep empty directories after filtering
+    --prune              Prune empty directories after filtering
+    --no-du              Hide directory size rollups
+    --du                 Show directory size rollups
+    --no-git             Hide git status
+    --git                Show git status
+    --clip                Copy output to clipboard
+-S, --sort <SORT>        Sort order (mtime, name, size, ext)
+```
 
 ## License
 

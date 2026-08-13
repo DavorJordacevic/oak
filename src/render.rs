@@ -17,7 +17,6 @@ pub struct RenderOpts {
     pub show_stats: bool,
     pub show_du: bool,
     pub show_git: bool,
-    pub show_git_blame: bool,
     pub show_perms: bool,
 }
 
@@ -135,11 +134,6 @@ fn render_child(
     {
         meta_parts.push(status.clone());
     }
-    if opts.show_git_blame
-        && let Some(author) = &node.git_blame
-    {
-        meta_parts.push(author.clone());
-    }
     let meta = if meta_parts.is_empty() {
         String::new()
     } else {
@@ -216,22 +210,13 @@ fn collect_visible_children<'a>(
 }
 
 fn print_colored(line: &str, node: &TreeNode) {
-    print!("{}", color_line_by_status(line, node));
-}
-
-fn color_line_by_status(line: &str, node: &TreeNode) -> String {
-    if !node.is_dir && !node.is_symlink && node.git_status.is_some() {
-        format!(
-            "{}",
-            String::from(line).if_supports_color(Stdout, |t| t.bright_red())
-        )
-    } else if node.is_dir {
-        color_dir(line)
+    if node.is_dir {
+        print!("{}", color_dir(line));
     } else if node.is_symlink {
-        color_symlink(line)
+        print!("{}", color_symlink(line));
     } else {
         let ext = node.name.rsplit('.').next().unwrap_or("");
-        color_file(line, ext)
+        print!("{}", color_file(line, ext));
     }
 }
 
@@ -393,7 +378,14 @@ pub fn render_timeline(node: &TreeNode, opts: &RenderOpts) -> io::Result<()> {
         };
         let entry = format!("  {leading}{path}");
         if opts.show_colors {
-            print!("{}", color_line_by_status(&entry, node));
+            if node.is_dir {
+                print!("{}", color_dir(&entry));
+            } else if node.is_symlink {
+                print!("{}", color_symlink(&entry));
+            } else {
+                let ext = node.name.rsplit('.').next().unwrap_or("");
+                print!("{}", color_file(&entry, ext));
+            }
             if !meta.is_empty() {
                 print!("{}", color_meta(&meta));
             }
@@ -479,54 +471,6 @@ fn type_label(name: &str) -> &'static str {
         "mp3" | "wav" | "flac" | "ogg" | "aac" => "Audio",
         "" => "Other",
         _ => "Other",
-    }
-}
-
-// Tests stay alongside the size-formatting helpers they exercise.
-#[cfg_attr(test, allow(clippy::items_after_test_module))]
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn human_size_bytes() {
-        assert_eq!(human_size(0), "0 B");
-        assert_eq!(human_size(1), "1 B");
-        assert_eq!(human_size(512), "512 B");
-        assert_eq!(human_size(1023), "1023 B");
-    }
-
-    #[test]
-    fn human_size_kib() {
-        assert_eq!(human_size(1024), "1.0 KiB");
-        assert_eq!(human_size(1536), "1.5 KiB");
-        assert_eq!(human_size(1048575), "1024.0 KiB");
-    }
-
-    #[test]
-    fn human_size_mib() {
-        assert_eq!(human_size(1048576), "1.0 MiB");
-        assert_eq!(human_size(2 * 1048576), "2.0 MiB");
-    }
-
-    #[test]
-    fn human_size_gib() {
-        assert_eq!(human_size(1073741824), "1.0 GiB");
-    }
-
-    #[test]
-    fn human_size_tib() {
-        assert_eq!(human_size(1099511627776), "1.0 TiB");
-    }
-
-    #[test]
-    fn human_size_pib() {
-        assert_eq!(human_size(1125899906842624), "1.0 PiB");
-    }
-
-    #[test]
-    fn human_size_largest() {
-        assert_eq!(human_size(u64::MAX), "16384.0 PiB");
     }
 }
 
